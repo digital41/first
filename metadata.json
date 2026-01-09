@@ -1,0 +1,8 @@
+{
+  "name": "KLY Groupe SAV",
+  "description": "Plateforme SAV intelligente automatisée avec résolution autonome et assistance IA Gemini.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
