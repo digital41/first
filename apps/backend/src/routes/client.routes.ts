@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../middlewares/index.js';
 import * as ticketController from '../controllers/ticket.controller.js';
 import * as orderController from '../controllers/order.controller.js';
@@ -15,63 +15,66 @@ import { upload } from '../config/multer.js';
 
 const router = Router();
 
+// Type casting pour les middlewares avec AuthenticatedRequest
+const auth = authenticate as unknown as RequestHandler;
+
 // ============================================
 // TICKETS CLIENT
 // ============================================
 
 // Créer un ticket (client)
-router.post('/tickets', authenticate, ticketController.create);
+router.post('/tickets', auth, ticketController.create as unknown as RequestHandler);
 
 // Voir ses propres tickets
-router.get('/tickets', authenticate, ticketController.list);
+router.get('/tickets', auth, ticketController.list as unknown as RequestHandler);
 
 // Voir un ticket spécifique (le middleware vérifie que c'est bien le sien)
-router.get('/tickets/:id', authenticate, ticketController.getOne);
+router.get('/tickets/:id', auth, ticketController.getOne as unknown as RequestHandler);
 
 // ============================================
 // MESSAGES CLIENT
 // ============================================
 
 // Voir les messages d'un ticket
-router.get('/tickets/:ticketId/messages', authenticate, messageController.getMessages);
+router.get('/tickets/:ticketId/messages', auth, messageController.getMessages as unknown as RequestHandler);
 
 // Envoyer un message dans un ticket
-router.post('/tickets/:ticketId/messages', authenticate, messageController.createMessage);
+router.post('/tickets/:ticketId/messages', auth, messageController.createMessage as unknown as RequestHandler);
 
 // ============================================
 // COMMANDES CLIENT
 // ============================================
 
 // Rechercher ses commandes
-router.get('/orders', authenticate, orderController.getOrders);
+router.get('/orders', auth, orderController.getOrders as unknown as RequestHandler);
 
 // Voir une commande spécifique
-router.get('/orders/:id', authenticate, orderController.getOrderById);
+router.get('/orders/:id', auth, orderController.getOrderById as unknown as RequestHandler);
 
 // ============================================
 // NOTIFICATIONS CLIENT
 // ============================================
 
 // Liste des notifications
-router.get('/notifications', authenticate, notificationController.getNotifications);
+router.get('/notifications', auth, notificationController.getNotifications as unknown as RequestHandler);
 
 // Nombre de non-lues
-router.get('/notifications/unread-count', authenticate, notificationController.getUnreadNotificationCount);
+router.get('/notifications/unread-count', auth, notificationController.getUnreadNotificationCount as unknown as RequestHandler);
 
 // Marquer comme lue(s)
-router.put('/notifications/read', authenticate, notificationController.markAsRead);
+router.put('/notifications/read', auth, notificationController.markAsRead as unknown as RequestHandler);
 
 // Marquer toutes comme lues
-router.put('/notifications/read-all', authenticate, notificationController.markAllAsRead);
+router.put('/notifications/read-all', auth, notificationController.markAllAsRead as unknown as RequestHandler);
 
 // ============================================
 // UPLOADS CLIENT
 // ============================================
 
 // Upload de fichiers (pièces jointes)
-router.post('/upload', authenticate, upload.array('files', 5), uploadController.uploadFiles);
+router.post('/upload', auth, upload.array('files', 5), uploadController.uploadFiles as unknown as RequestHandler);
 
 // Récupérer un fichier
-router.get('/upload/:id', authenticate, uploadController.getAttachment);
+router.get('/upload/:id', auth, uploadController.getAttachment as unknown as RequestHandler);
 
 export default router;

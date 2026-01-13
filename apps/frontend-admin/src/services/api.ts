@@ -282,9 +282,10 @@ export const AdminApi = {
     if (filters?.status) params.set('status', filters.status);
     if (filters?.search) params.set('search', filters.search);
     const query = params.toString() ? `?${params.toString()}` : '';
-    const response = await fetchWithAuth<{ data: User[] } | User[]>(`/admin/users${query}`);
+    const response = await fetchWithAuth<{ users: User[]; data?: User[] } | User[]>(`/admin/users${query}`);
     if (Array.isArray(response)) return response;
-    return response.data || [];
+    // Backend returns { users, pagination } or { data }
+    return response.users || response.data || [];
   },
 
   async getUserById(userId: string): Promise<User> {

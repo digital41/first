@@ -65,6 +65,7 @@ export async function listUsers(filters: UserFilters = {}) {
         updatedAt: true,
         _count: {
           select: {
+            // Total de tickets assignés (historique complet)
             assignedTickets: true,
           },
         },
@@ -76,8 +77,24 @@ export async function listUsers(filters: UserFilters = {}) {
     prisma.user.count({ where }),
   ]);
 
+  // Enrichir avec le compte des tickets actifs
+  const usersWithActiveTickets = await Promise.all(
+    users.map(async (user) => {
+      const activeTicketsCount = await prisma.ticket.count({
+        where: {
+          assignedToId: user.id,
+          status: { notIn: ['CLOSED', 'RESOLVED'] },
+        },
+      });
+      return {
+        ...user,
+        activeTicketsCount,
+      };
+    })
+  );
+
   return {
-    users,
+    users: usersWithActiveTickets,
     pagination: {
       page,
       limit,

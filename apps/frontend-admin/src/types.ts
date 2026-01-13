@@ -57,6 +57,13 @@ export interface User {
   lastLoginAt?: string;
   createdAt: string;
   updatedAt?: string;
+  // Stats from backend
+  _count?: {
+    assignedTickets?: number;
+    tickets?: number;
+    messages?: number;
+  };
+  activeTicketsCount?: number; // For available agents endpoint
 }
 
 export interface AuthTokens {

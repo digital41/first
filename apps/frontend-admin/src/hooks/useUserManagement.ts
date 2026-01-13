@@ -79,6 +79,12 @@ const DEFAULT_FILTERS: UserFilters = {};
 // ============================================
 
 const mapUserToManagedUser = (user: User): ManagedUser => {
+  // Get real stats from backend
+  // activeTicketsCount = tickets non fermés/résolus (en cours)
+  // _count.assignedTickets = total des tickets assignés (historique)
+  const currentActiveTickets = user.activeTicketsCount ?? 0;
+  const totalTicketsHandled = user._count?.assignedTickets ?? 0;
+
   return {
     id: user.id,
     email: user.email,
@@ -88,7 +94,11 @@ const mapUserToManagedUser = (user: User): ManagedUser => {
     avatarUrl: user.avatarUrl,
     phone: user.phone,
     profile: createDefaultOperatorProfile(),
-    stats: createDefaultStats(),
+    stats: {
+      ...createDefaultStats(),
+      currentActiveTickets,
+      totalTicketsHandled,
+    },
     createdAt: user.createdAt || new Date().toISOString(),
     updatedAt: user.updatedAt || new Date().toISOString(),
     lastLoginAt: user.lastLoginAt,

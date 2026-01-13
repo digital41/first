@@ -2,15 +2,24 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
-import { LogOut, Bell, User, Shield } from 'lucide-react';
+import UsersAdminPage from './components/users/UsersAdminPage';
+import { LogOut, Bell, User, Shield, Users, ArrowLeft } from 'lucide-react';
+import { UserRole } from './lib/userManagementTypes';
 
 // ============================================
 // COMPOSANT PRINCIPAL ADMIN
 // ============================================
 
+// Types de pages disponibles
+type PageType = 'dashboard' | 'users';
+
 const AdminContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, logout, notifications, unreadCount } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
+
+  // Vérifie si l'utilisateur est admin
+  const isAdmin = user?.role === 'ADMIN' || user?.role === UserRole.ADMIN;
 
   // Loading
   if (isLoading) {
@@ -35,19 +44,47 @@ const AdminContent: React.FC = () => {
       {/* Header Admin */}
       <header className="bg-slate-900 text-white sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <Shield className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-lg font-bold">KLY Admin</span>
-              <span className="text-xs text-slate-400 block">Gestion SAV</span>
+          {/* Logo + Navigation */}
+          <div className="flex items-center space-x-4">
+            {/* Back button when on users page */}
+            {currentPage === 'users' && (
+              <button
+                onClick={() => setCurrentPage('dashboard')}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                title="Retour au dashboard"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Logo */}
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-lg font-bold">KLY Admin</span>
+                <span className="text-xs text-slate-400 block">
+                  {currentPage === 'dashboard' ? 'Gestion SAV' : 'Gestion des Agents'}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-center space-x-4">
+            {/* Bouton Agents - ADMIN ONLY */}
+            {isAdmin && currentPage === 'dashboard' && (
+              <button
+                onClick={() => setCurrentPage('users')}
+                className="flex items-center space-x-2 px-3 py-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                title="Gérer les agents"
+              >
+                <Users className="w-5 h-5" />
+                <span className="hidden md:inline text-sm">Agents</span>
+              </button>
+            )}
+
             {/* Notifications */}
             <div className="relative">
               <button
@@ -116,8 +153,15 @@ const AdminContent: React.FC = () => {
         </div>
       </header>
 
-      {/* Dashboard */}
-      <AdminDashboard />
+      {/* Page Content */}
+      {currentPage === 'dashboard' && (
+        <AdminDashboard
+          onNavigateToUsers={isAdmin ? () => setCurrentPage('users') : undefined}
+        />
+      )}
+      {currentPage === 'users' && isAdmin && (
+        <UsersAdminPage currentUserRole={user?.role as UserRole} />
+      )}
     </div>
   );
 };
