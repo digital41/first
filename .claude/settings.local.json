@@ -15,7 +15,14 @@
       "Bash(npx kill-port:*)",
       "Bash(taskkill:*)",
       "Bash(npm run build:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(test:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(ss -tlnp:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWtjaG12NnowMDAwcWh6cmhlOWRuNDN2IiwiZW1haWwiOiJhZG1pbkBrbHlncm91cGUuY29tIiwicm9sZSI6IkFETUlOIiwidHlwZSI6ImFjY2VzcyIsImlhdCI6MTc2ODMwOTUxNywiZXhwIjoxNzY4MzEwNDE3fQ.h8SPuECyVCXP8mrhVm5UR5KKf17tFshpyfOiV9KvUV8\")",
+      "Bash(npx prisma:*)"
     ]
   }
 }

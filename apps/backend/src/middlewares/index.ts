@@ -2,7 +2,17 @@
 // EXPORT DES MIDDLEWARES
 // ============================================
 
-export { authenticate, requireRoles, requireAdmin, requireStaff } from './auth.middleware.js';
+export {
+  authenticate,
+  optionalAuth,
+  requireRoles,
+  requireAdmin,
+  requireSupervisor,
+  requireStaff,
+  requireClient,
+  blockNonStaff,
+  blockStaff,
+} from './auth.middleware.js';
 export { AppError, errorHandler, notFoundHandler } from './error.middleware.js';
 export {
   validate,

@@ -34,7 +34,7 @@ const AuthContextual: React.FC<AuthContextualProps> = ({ intent, onAuthenticated
     }
 
     try {
-      const result = await ApiService.login(orderId, plNumber, blNumber);
+      const result = await ApiService.loginByReference(orderId, plNumber, blNumber);
 
       // Afficher un avertissement en mode fallback mais continuer
       if (result.mode === 'fallback' && result.message) {

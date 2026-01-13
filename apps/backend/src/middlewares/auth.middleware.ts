@@ -115,8 +115,84 @@ export const requireAdmin = requireRoles('ADMIN');
 /** Requiert le rôle ADMIN ou SUPERVISOR */
 export const requireSupervisor = requireRoles('ADMIN', 'SUPERVISOR');
 
-/** Requiert le rôle ADMIN, SUPERVISOR ou AGENT */
+/** Requiert le rôle ADMIN, SUPERVISOR ou AGENT (staff interne) */
 export const requireStaff = requireRoles('ADMIN', 'SUPERVISOR', 'AGENT');
+
+/** Requiert le rôle CUSTOMER uniquement (espace client) */
+export const requireClient = requireRoles('CUSTOMER');
+
+// ============================================
+// MIDDLEWARE: Bloquer accès admin non autorisé
+// ============================================
+
+/**
+ * Bloque strictement les accès non-staff aux routes admin
+ * Retourne 403 Forbidden avec message explicite
+ */
+export function blockNonStaff(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentification requise.',
+      code: 'AUTH_REQUIRED',
+    });
+    return;
+  }
+
+  const staffRoles: UserRole[] = ['ADMIN', 'SUPERVISOR', 'AGENT'];
+
+  if (!staffRoles.includes(req.user.role)) {
+    // Log tentative d'accès non autorisé
+    console.warn(
+      `[SECURITY] Tentative d'accès admin bloquée - User: ${req.user.id} (${req.user.role}) - Route: ${req.originalUrl}`
+    );
+
+    res.status(403).json({
+      success: false,
+      error: 'Accès interdit. Cette zone est réservée au personnel autorisé.',
+      code: 'ADMIN_ACCESS_DENIED',
+    });
+    return;
+  }
+
+  next();
+}
+
+/**
+ * Bloque strictement les accès staff aux routes client
+ * (optionnel, pour séparer complètement les espaces)
+ */
+export function blockStaff(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentification requise.',
+      code: 'AUTH_REQUIRED',
+    });
+    return;
+  }
+
+  const staffRoles: UserRole[] = ['ADMIN', 'SUPERVISOR', 'AGENT'];
+
+  if (staffRoles.includes(req.user.role)) {
+    res.status(403).json({
+      success: false,
+      error: 'Accès réservé aux clients. Utilisez l\'interface d\'administration.',
+      code: 'CLIENT_ACCESS_ONLY',
+    });
+    return;
+  }
+
+  next();
+}
 
 // ============================================
 // MIDDLEWARE: Auth optionnel

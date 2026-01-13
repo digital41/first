@@ -191,6 +191,7 @@ model ChatMessage {
   author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
 
   content   String
+  isInternal Boolean @default(false) // Note interne (invisible pour le client)
   readBy    Json?
 
   createdAt DateTime @default(now())

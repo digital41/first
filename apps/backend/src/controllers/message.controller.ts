@@ -44,9 +44,15 @@ export async function getMessages(
       return;
     }
 
+    // Les clients ne voient pas les notes internes
+    const isCustomer = role === 'CUSTOMER';
+    const whereClause = isCustomer
+      ? { ticketId, isInternal: false }
+      : { ticketId };
+
     // Récupérer les messages
     const messages = await prisma.chatMessage.findMany({
-      where: { ticketId },
+      where: whereClause,
       take: limit,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       orderBy: { createdAt: 'desc' },
@@ -84,13 +90,17 @@ export async function createMessage(
 ): Promise<void> {
   try {
     const ticketId = req.params.ticketId as string;
-    const { content } = req.body;
-    const { id: userId } = req.user;
+    const { content, isInternal = false } = req.body;
+    const { id: userId, role } = req.user;
 
     if (!content || content.trim().length === 0) {
       res.status(400).json({ success: false, error: 'Contenu requis' });
       return;
     }
+
+    // Seul le staff peut créer des notes internes
+    const isStaff = ['ADMIN', 'SUPERVISOR', 'AGENT'].includes(role);
+    const finalIsInternal = isStaff ? Boolean(isInternal) : false;
 
     // Vérifier ticket existe
     const ticket = await prisma.ticket.findUnique({
@@ -108,6 +118,7 @@ export async function createMessage(
         ticketId,
         authorId: userId,
         content: content.trim(),
+        isInternal: finalIsInternal,
       },
       include: {
         author: {
@@ -122,14 +133,17 @@ export async function createMessage(
       data: { updatedAt: new Date() },
     });
 
-    // Broadcast via WebSocket
-    broadcastTicketUpdate(ticketId, 'newMessage', {
-      id: message.id,
-      authorId: message.author.id,
-      authorName: message.author.displayName,
-      content: message.content,
-      createdAt: message.createdAt.toISOString(),
-    });
+    // Broadcast via WebSocket (ne pas broadcaster les notes internes au client)
+    if (!finalIsInternal) {
+      broadcastTicketUpdate(ticketId, 'newMessage', {
+        id: message.id,
+        authorId: message.author.id,
+        authorName: message.author.displayName,
+        content: message.content,
+        isInternal: message.isInternal,
+        createdAt: message.createdAt.toISOString(),
+      });
+    }
 
     res.status(201).json({
       success: true,

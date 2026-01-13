@@ -1,58 +1,68 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes.js';
-import ticketRoutes from './ticket.routes.js';
 import healthRoutes from './health.routes.js';
-import uploadRoutes from './upload.routes.js';
-import messageRoutes from './message.routes.js';
-import orderRoutes from './order.routes.js';
-import notificationRoutes from './notification.routes.js';
-import userRoutes from './user.routes.js';
-import slaRoutes from './sla.routes.js';
-import cannedResponseRoutes from './canned-response.routes.js';
+import clientRoutes from './client.routes.js';
+import adminRoutes from './admin.routes.js';
 
 // ============================================
 // ROUTEUR PRINCIPAL
 // ============================================
+//
+// Structure des routes:
+// - /api/health     -> Health checks (public)
+// - /api/auth       -> Authentification (public)
+// - /api/client/*   -> Espace client SAV (CUSTOMER)
+// - /api/admin/*    -> Espace administration (ADMIN, SUPERVISOR, AGENT)
+//
 
 const router = Router();
 
-// Routes de santé (pas de préfixe pour /health)
+// ============================================
+// ROUTES PUBLIQUES
+// ============================================
+
+// Health checks
 router.use('/health', healthRoutes);
 
-// Routes d'authentification
+// Authentification (client + admin)
 router.use('/auth', authRoutes);
 
-// Routes des tickets
-router.use('/tickets', ticketRoutes);
+// ============================================
+// ROUTES PROTÉGÉES
+// ============================================
 
-// Routes upload (fichiers)
-router.use('/upload', uploadRoutes);
+// Espace Client SAV
+router.use('/client', clientRoutes);
 
-// Routes commandes
-router.use('/orders', orderRoutes);
+// Espace Administration (staff uniquement)
+router.use('/admin', adminRoutes);
 
-// Routes notifications
-router.use('/notifications', notificationRoutes);
+// ============================================
+// ROUTE RACINE
+// ============================================
 
-// Routes utilisateurs
-router.use('/users', userRoutes);
-
-// Routes SLA
-router.use('/sla', slaRoutes);
-
-// Routes réponses prédéfinies
-router.use('/canned-responses', cannedResponseRoutes);
-
-// Routes messages (montées à la racine car chemins mixtes)
-router.use('/', messageRoutes);
-
-// Route racine API
 router.get('/', (_req, res) => {
   res.json({
     name: 'KLY SAV API',
     version: '1.0.0',
-    documentation: '/api/docs',
-    health: '/api/health',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      client: '/api/client (espace client)',
+      admin: '/api/admin (staff uniquement)',
+    },
+  });
+});
+
+// ============================================
+// 404 - Route non trouvée
+// ============================================
+
+router.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `Route ${req.method} ${req.originalUrl} non trouvée`,
+    hint: 'Vérifiez le préfixe: /api/client/* ou /api/admin/*',
   });
 });
 

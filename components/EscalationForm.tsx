@@ -1,8 +1,24 @@
 import React, { useState } from 'react';
 import { Calendar, Camera, Check, Phone, User, Mail, Building2, Send, Loader2, Info, AlertCircle, X, FileVideo, FileImage, Package, FileText } from 'lucide-react';
 import { MOCK_SLOTS } from '../constants';
-import { Order, Intent, Ticket, OrderItem } from '../types';
+import { Order, Intent, Ticket, OrderItem, IssueType, CreateTicketPayload, TicketPriority } from '../types';
 import { ApiService } from '../services/api';
+
+// Mapping Intent -> IssueType pour compatibilité
+const intentToIssueType = (intent: Intent): IssueType => {
+  switch (intent) {
+    case Intent.TECHNICAL:
+      return IssueType.TECHNICAL;
+    case Intent.DELIVERY:
+      return IssueType.DELIVERY;
+    case Intent.INVOICE:
+      return IssueType.BILLING;
+    case Intent.RETURN:
+    case Intent.NONE:
+    default:
+      return IssueType.OTHER;
+  }
+};
 
 interface EscalationFormProps {
   order: Order;
@@ -64,7 +80,7 @@ const EscalationForm: React.FC<EscalationFormProps> = ({ order, intent, selected
         
         // Construction des références croisées pour le ticket
         const referencesContext = `
-Ref Commande (BC): ${order.id}
+Ref Commande (BC): ${order.orderNumber || order.id}
 Ref PL (Packing List): ${order.plNumber || 'N/A'}
 Ref BL (Livraison): ${order.blNumber || 'N/A'}
         `.trim();
@@ -90,19 +106,23 @@ ${chatHistory.substring(0, 800)}...
         `.trim();
 
       // 2. Création du ticket avec les métadonnées des fichiers
-      const result = await ApiService.createTicket({
+      const ticketPayload: CreateTicketPayload = {
+        title: `SAV - ${companyName} - ${intentToIssueType(intent)}`,
+        description: compiledDescription,
+        issueType: intentToIssueType(intent),
+        priority: TicketPriority.MEDIUM,
         orderId: order.id,
         companyName: companyName,
         contactName: contactName,
         contactEmail: contactEmail,
         contactPhone: contactPhone,
-        issueType: intent,
-        description: compiledDescription,
-        hasPhoto: uploadedUrls.length > 0,
-        attachments: uploadedUrls,
         callbackSlot: selectedSlot,
-        affectedProducts: selectedProducts.map(p => p.ref)
-      });
+        affectedProducts: selectedProducts.map(p => p.ref),
+        attachments: uploadedUrls,
+        tags: ['sav', 'portail-client'],
+      };
+
+      const result = await ApiService.createTicket(ticketPayload);
 
       setTicketId(result.data.id);
       setSubmitted(true);
@@ -166,7 +186,7 @@ ${chatHistory.substring(0, 800)}...
                     <h4 className="font-bold text-slate-700 text-sm">Références Dossier</h4>
                 </div>
                 <div className="space-y-1 text-xs text-slate-600 font-mono">
-                    <p><span className="text-slate-400 w-8 inline-block">BC:</span> {order.id}</p>
+                    <p><span className="text-slate-400 w-8 inline-block">BC:</span> {order.orderNumber || order.id}</p>
                     {order.plNumber && <p><span className="text-slate-400 w-8 inline-block">PL:</span> {order.plNumber}</p>}
                     {order.blNumber && <p><span className="text-slate-400 w-8 inline-block">BL:</span> {order.blNumber}</p>}
                 </div>
