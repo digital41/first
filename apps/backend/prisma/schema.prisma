@@ -111,20 +111,40 @@ model User {
 }
 
 // ============================================
-// MODEL: ORDER
+// MODEL: ORDER (Compatible SAGE 100)
 // ============================================
 
 model Order {
   id            String   @id @default(cuid())
-  orderNumber   String   @unique
+
+  // Références SAGE 100
+  orderNumber   String   @unique  // BC - Bon de Commande
+  blNumber      String?  @unique  // BL - Bon de Livraison
+  faNumber      String?  @unique  // FA - Facture
+
+  // Client
   customerEmail String?
   customerPhone String?
+  customerName  String?
+  companyName   String?
+
+  // Métadonnées SAGE
+  sageRef       String?           // Référence interne SAGE
+  orderDate     DateTime?         // Date de commande
+  deliveryDate  DateTime?         // Date de livraison prévue
+  totalAmount   Decimal?          // Montant total HT
+  status        String?           // Statut SAGE (en cours, livrée, facturée)
+
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   tickets Ticket[]
 
   @@index([orderNumber])
+  @@index([blNumber])
+  @@index([faNumber])
   @@index([customerEmail])
+  @@index([sageRef])
 }
 
 // ============================================
@@ -149,6 +169,12 @@ model Ticket {
   // Customer
   customerId String?
   customer   User? @relation("CustomerTickets", fields: [customerId], references: [id], onDelete: SetNull)
+
+  // Contact info (pour tickets créés manuellement sans compte client)
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  companyName  String?
 
   // Agent assigne
   assignedToId String?

@@ -195,25 +195,35 @@ export const ApiService = {
     blNumber?: string
   ): Promise<ApiResult<Order>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      // Build payload - only include non-empty values to satisfy backend validation (min:1)
+      const payload: Record<string, string> = {};
+      if (orderNumber?.trim()) payload.orderNumber = orderNumber.trim();
+      if (plNumber?.trim()) payload.plNumber = plNumber.trim();
+      if (blNumber?.trim()) payload.blNumber = blNumber.trim();
+
+      const url = `${API_BASE_URL}/auth/login`;
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderNumber, plNumber, blNumber }),
+        body: JSON.stringify(payload),
       });
+
+      const responseText = await response.text();
 
       if (response.ok) {
         // Le backend retourne { success, data: { user, order, tokens }, message }
-        const responseBody = await response.json();
-        const payload = responseBody.data || responseBody;
+        const responseBody = JSON.parse(responseText);
+        const data = responseBody.data || responseBody;
 
         // Si le backend retourne des tokens, les stocker
-        if (payload.tokens) {
-          TokenStorage.setTokens(payload.tokens);
+        if (data.tokens) {
+          TokenStorage.setTokens(data.tokens);
         }
-        if (payload.user) {
-          TokenStorage.setUser(payload.user);
+        if (data.user) {
+          TokenStorage.setUser(data.user);
         }
-        return { data: payload.order || payload, mode: 'online' };
+        return { data: data.order || data, mode: 'online' };
       }
 
       console.warn('API Backend réponse non-ok, passage en mode fallback.');
@@ -235,8 +245,7 @@ export const ApiService = {
           ref: 'GENERIC',
           name: 'Ensemble de la commande / Dossier global',
           quantity: 1,
-          imageUrl:
-            'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&w=100&q=80',
+          imageUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect fill="%23e2e8f0" width="100" height="100"/%3E%3Ctext fill="%2364748b" font-family="Arial" font-size="14" x="50" y="55" text-anchor="middle"%3ESAV%3C/text%3E%3C/svg%3E',
         },
       ],
     };
@@ -561,6 +570,26 @@ export const ApiService = {
     };
 
     await send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
+  },
+
+  // ==========================================
+  // ALIAS METHODS (for component compatibility)
+  // ==========================================
+
+  /**
+   * Alias for sendMessage - used by new UI components
+   */
+  async sendTicketMessage(ticketId: string, content: string): Promise<TicketMessage> {
+    return this.sendMessage(ticketId, content);
+  },
+
+  /**
+   * Get order by reference - wrapper for loginByReference
+   * Used by GuidedTicketFlow component
+   */
+  async getOrderByReference(reference: string): Promise<Order> {
+    const result = await this.loginByReference(reference);
+    return result.data;
   },
 };
 

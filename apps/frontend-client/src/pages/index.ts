@@ -1,0 +1,10 @@
+export { LoginPage } from './LoginPage';
+export { DashboardPage } from './DashboardPage';
+export { SmartHomePage } from './SmartHomePage';
+export { TicketsListPage } from './TicketsListPage';
+export { CreateTicketPage } from './CreateTicketPage';
+export { TicketDetailPage } from './TicketDetailPage';
+export { OrdersListPage, OrderDetailPage } from './OrdersPage';
+export { FAQPage } from './FAQPage';
+export { KnowledgeBasePage } from './KnowledgeBasePage';
+export { ContactPage } from './ContactPage';

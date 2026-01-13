@@ -31,3 +31,9 @@ export { SLAAlertCenter, SLAAlertBanner } from './alerts';
 
 // User Management module (ADMIN only)
 export { UsersAdminPage, UserFormModal } from './users';
+
+// Layout components
+export { AdminSidebar, AdminLayout } from './layout';
+
+// Tickets module
+export { CreateTicket } from './tickets';

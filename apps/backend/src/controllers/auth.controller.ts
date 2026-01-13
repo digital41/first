@@ -9,7 +9,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 
 /**
  * POST /api/auth/login
- * Connexion client par références commande
+ * Connexion client par références SAGE 100 (BC, BL ou FA)
  */
 export async function loginByReference(
   req: Request,
@@ -17,10 +17,10 @@ export async function loginByReference(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { orderNumber } = req.body;
-    const result = await authService.loginByReference(orderNumber);
+    const { orderNumber, blNumber, faNumber } = req.body;
+    const result = await authService.loginByReference(orderNumber, blNumber, faNumber);
 
-    sendSuccess(res, result, 'Connexion réussie');
+    sendSuccess(res, result, `Connexion réussie via ${result.referenceType}`);
   } catch (error) {
     next(error);
   }

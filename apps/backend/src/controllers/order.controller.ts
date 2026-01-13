@@ -17,23 +17,20 @@ export async function getOrders(
   res: Response
 ): Promise<void> {
   try {
-    const { role } = req.user;
+    const { role, email } = req.user;
     const { search, page = '1', limit = '20' } = req.query;
 
     const pageNum = Math.max(1, parseInt(page as string, 10));
     const limitNum = Math.min(50, Math.max(1, parseInt(limit as string, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Seuls admins et staff peuvent lister toutes les commandes
-    if (role === 'CUSTOMER') {
-      res.status(403).json({ success: false, error: 'Accès refusé' });
-      return;
-    }
-
     const where: Record<string, unknown> = {};
 
-    // Recherche par numéro de commande ou email client
-    if (search) {
+    // Clients ne voient que leurs propres commandes
+    if (role === 'CUSTOMER') {
+      where.customerEmail = { equals: email, mode: 'insensitive' };
+    } else if (search) {
+      // Admins/Agents peuvent rechercher toutes les commandes
       where.OR = [
         { orderNumber: { contains: search as string, mode: 'insensitive' } },
         { customerEmail: { contains: search as string, mode: 'insensitive' } },
@@ -81,13 +78,7 @@ export async function getOrderById(
 ): Promise<void> {
   try {
     const id = req.params.id as string;
-    const { role } = req.user;
-
-    // Seuls admins et staff peuvent voir les détails
-    if (role === 'CUSTOMER') {
-      res.status(403).json({ success: false, error: 'Accès refusé' });
-      return;
-    }
+    const { role, email } = req.user;
 
     const order = await prisma.order.findUnique({
       where: { id },
@@ -108,6 +99,12 @@ export async function getOrderById(
 
     if (!order) {
       res.status(404).json({ success: false, error: 'Commande non trouvée' });
+      return;
+    }
+
+    // Clients ne peuvent voir que leurs propres commandes
+    if (role === 'CUSTOMER' && order.customerEmail?.toLowerCase() !== email?.toLowerCase()) {
+      res.status(403).json({ success: false, error: 'Accès refusé' });
       return;
     }
 

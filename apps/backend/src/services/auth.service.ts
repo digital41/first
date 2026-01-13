@@ -42,22 +42,48 @@ export function generateTokenPair(user: Pick<User, 'id' | 'email' | 'role'>): To
 }
 
 /**
- * Connexion client par numéro de commande
+ * Connexion client par référence SAGE 100 (BC, BL ou FA)
+ * Accepte n'importe quelle référence valide et retourne la commande associée
  */
 export async function loginByReference(
-  orderNumber?: string
-): Promise<{ user: SafeUser; order: unknown; tokens: TokenPair }> {
-  if (!orderNumber) {
-    throw AppError.badRequest('Numéro de commande requis');
+  orderNumber?: string,  // BC - Bon de Commande
+  blNumber?: string,     // BL - Bon de Livraison
+  faNumber?: string      // FA - Facture
+): Promise<{ user: SafeUser; order: unknown; tokens: TokenPair; referenceType: string }> {
+  // Vérifier qu'au moins une référence est fournie
+  if (!orderNumber && !blNumber && !faNumber) {
+    throw AppError.badRequest('Au moins une référence (BC, BL ou FA) est requise');
   }
 
-  // Recherche de la commande
-  const order = await prisma.order.findUnique({
-    where: { orderNumber },
-  });
+  let order = null;
+  let referenceType = '';
+
+  // Recherche par BC (Bon de Commande)
+  if (orderNumber) {
+    order = await prisma.order.findUnique({
+      where: { orderNumber },
+    });
+    if (order) referenceType = 'BC';
+  }
+
+  // Si pas trouvé, recherche par BL (Bon de Livraison)
+  if (!order && blNumber) {
+    order = await prisma.order.findUnique({
+      where: { blNumber },
+    });
+    if (order) referenceType = 'BL';
+  }
+
+  // Si pas trouvé, recherche par FA (Facture)
+  if (!order && faNumber) {
+    order = await prisma.order.findUnique({
+      where: { faNumber },
+    });
+    if (order) referenceType = 'FA';
+  }
 
   if (!order) {
-    throw AppError.notFound('Aucune commande trouvée avec ce numéro');
+    throw AppError.notFound('Aucune commande trouvée avec cette référence');
   }
 
   // Recherche ou création du client
@@ -68,11 +94,17 @@ export async function loginByReference(
     : null;
 
   if (!user) {
+    // Créer un utilisateur avec les infos de la commande
+    const displayName = order.customerName
+      || order.customerEmail?.split('@')[0]
+      || `Client ${order.orderNumber}`;
+
     user = await prisma.user.create({
       data: {
         email: order.customerEmail || `order-${order.id}@temp.klygroupe.com`,
-        displayName: order.customerEmail?.split('@')[0] || `Client ${order.orderNumber}`,
+        displayName,
         role: 'CUSTOMER',
+        phone: order.customerPhone,
       },
     });
   }
@@ -89,7 +121,7 @@ export async function loginByReference(
   // Retourne sans le hash du mot de passe
   const { passwordHash: _, ...safeUser } = user;
 
-  return { user: safeUser, order, tokens };
+  return { user: safeUser, order, tokens, referenceType };
 }
 
 /**

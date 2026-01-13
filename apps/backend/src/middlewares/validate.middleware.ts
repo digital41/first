@@ -68,16 +68,16 @@ export const cuidSchema = z.object({
   id: z.string().cuid(),
 });
 
-// Authentification par références
+// Authentification par références SAGE 100
 export const loginByReferenceSchema = z
   .object({
-    orderNumber: z.string().min(1).optional(),
-    plNumber: z.string().min(1).optional(),
-    blNumber: z.string().min(1).optional(),
+    orderNumber: z.string().min(1).optional(),  // BC - Bon de Commande
+    blNumber: z.string().min(1).optional(),     // BL - Bon de Livraison
+    faNumber: z.string().min(1).optional(),     // FA - Facture
   })
   .refine(
-    (data) => data.orderNumber || data.plNumber || data.blNumber,
-    { message: 'Au moins une référence (BC, PL ou BL) est requise' }
+    (data) => data.orderNumber || data.blNumber || data.faNumber,
+    { message: 'Au moins une référence SAGE (BC, BL ou FA) est requise' }
   );
 
 // Authentification admin

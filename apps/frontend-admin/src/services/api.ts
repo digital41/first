@@ -241,6 +241,23 @@ export const AdminApi = {
     return fetchWithAuth<TicketStats>('/admin/tickets/stats');
   },
 
+  async createTicket(data: {
+    title: string;
+    description?: string;
+    issueType: string;
+    priority?: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    companyName?: string;
+    tags?: string[];
+  }): Promise<Ticket> {
+    return fetchWithAuth<Ticket>('/admin/tickets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // ==========================================
   // MESSAGES (Admin)
   // ==========================================

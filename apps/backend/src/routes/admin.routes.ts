@@ -33,6 +33,9 @@ router.use(auth, staffOnly);
 // Liste tous les tickets (avec filtres)
 router.get('/tickets', ticketController.list as unknown as RequestHandler);
 
+// Créer un ticket (création manuelle par un agent/admin)
+router.post('/tickets', ticketController.create as unknown as RequestHandler);
+
 // Statistiques des tickets
 router.get('/tickets/stats', ticketController.stats as unknown as RequestHandler);
 

@@ -68,6 +68,11 @@ export interface CreateTicketDto {
   issueType: 'TECHNICAL' | 'DELIVERY' | 'BILLING' | 'OTHER';
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   tags?: string[];
+  // Champs pour création manuelle (admin/agent)
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  companyName?: string;
 }
 
 export interface UpdateTicketDto {

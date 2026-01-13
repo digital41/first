@@ -84,6 +84,19 @@ const TicketPreviewPanel: React.FC<TicketPreviewPanelProps> = ({
     return colors[status] || 'bg-slate-100 text-slate-600';
   };
 
+  const getStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      OPEN: 'Ouvert',
+      IN_PROGRESS: 'En cours',
+      WAITING_CUSTOMER: 'Attente client',
+      RESOLVED: 'Résolu',
+      CLOSED: 'Fermé',
+      ESCALATED: 'Escaladé',
+      REOPENED: 'Réouvert',
+    };
+    return labels[status] || status;
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -99,7 +112,7 @@ const TicketPreviewPanel: React.FC<TicketPreviewPanelProps> = ({
           <div className="flex items-center space-x-3">
             <h3 className="font-semibold text-slate-800">Aperçu rapide</h3>
             <span className={`px-2 py-0.5 text-xs rounded-full ${getStatusColor(ticket.status)}`}>
-              {ticket.status}
+              {getStatusLabel(ticket.status)}
             </span>
           </div>
           <div className="flex items-center space-x-2">

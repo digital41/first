@@ -1,0 +1,244 @@
+================================================================================
+                    SYNTHESE PROJET KLY GROUPE - PLATEFORME SAV
+================================================================================
+                            Date: 13 Janvier 2026
+================================================================================
+
+================================================================================
+                              ARCHITECTURE GLOBALE
+================================================================================
+
+Structure du projet:
+-------------------
+/apps
+  /backend          -> API Node.js/Express + Prisma (PostgreSQL)
+  /frontend-admin   -> Interface Admin React + Vite + TailwindCSS
+
+Ports:
+------
+- Backend API:      http://localhost:3000
+- Frontend Admin:   http://localhost:5000
+
+================================================================================
+                          FONCTIONNALITES IMPLEMENTEES
+================================================================================
+
+1. AUTHENTIFICATION
+-------------------
+   [OK] Login admin avec JWT (access token + refresh token)
+   [OK] Middleware d'authentification
+   [OK] Gestion des roles (ADMIN, SUPERVISOR, AGENT, CLIENT)
+   [OK] Protection des routes selon les roles
+   [OK] Stockage securise des tokens (localStorage)
+   [OK] Refresh automatique des tokens expires
+
+2. GESTION DES TICKETS
+----------------------
+   [OK] Liste des tickets avec pagination
+   [OK] Filtres par statut, priorite, type, agent assigne
+   [OK] Recherche textuelle
+   [OK] Detail d'un ticket
+   [OK] Mise a jour du statut/priorite/assignation
+   [OK] Creation manuelle de tickets (admin/agent)
+   [OK] Statistiques des tickets (KPIs)
+   [OK] Page "Tickets ouverts" filtree
+   [OK] Page "Tickets fermes" filtree
+
+3. MESSAGES / CONVERSATION
+--------------------------
+   [OK] Affichage des messages d'un ticket
+   [OK] Envoi de messages (publics ou internes)
+   [OK] Messages internes (notes privees entre agents)
+   [OK] Interface chat avec distinction visuelle
+   [OK] Apercu rapide des derniers messages (preview panel)
+   [OK] UI pour joindre des fichiers au chat (frontend pret)
+
+4. INTERFACE ADMIN
+------------------
+   [OK] Sidebar de navigation avec sections
+   [OK] Dashboard avec KPIs (tickets ouverts, en cours, resolus, SLA depasse)
+   [OK] Tableau des tickets avec selection multiple
+   [OK] Actions en masse (assigner, changer statut/priorite)
+   [OK] Filtres predefinis intelligents (SmartFilterPresets)
+   [OK] Widget de charge des agents (AgentWorkloadWidget)
+   [OK] Panneau de previsualisation rapide
+   [OK] Countdown SLA
+   [OK] Macros / reponses rapides
+
+5. GESTION DES UTILISATEURS
+---------------------------
+   [OK] Liste des utilisateurs (admin)
+   [OK] Creation d'utilisateurs staff
+   [OK] Modification des utilisateurs
+   [OK] Suppression des utilisateurs
+   [OK] Liste des agents disponibles
+   [OK] Statistiques par agent
+   [OK] Masquage des sections sensibles pour les agents (Orders, Customers)
+
+6. NOTIFICATIONS
+----------------
+   [OK] Recuperation des notifications
+   [OK] Marquer comme lu (une ou toutes)
+   [OK] Compteur de non-lues
+
+7. REPONSES PREDEFINIES (Canned Responses)
+------------------------------------------
+   [OK] CRUD complet (liste, creation, modification, suppression)
+
+8. SLA
+------
+   [OK] Configuration SLA
+   [OK] Mise a jour des configs (admin)
+   [OK] Affichage du countdown
+   [OK] Indicateur SLA depasse
+
+9. UPLOAD DE FICHIERS
+---------------------
+   [OK] Route backend pour upload (multer)
+   [OK] UI drag & drop pour creation de ticket
+   [OK] UI pour joindre fichiers dans le chat
+   [OK] Preview des images
+   [OK] Validation type/taille fichiers
+
+10. TRADUCTIONS FRANCAIS
+------------------------
+   [OK] Statuts: OPEN->Ouvert, IN_PROGRESS->En cours, etc.
+   [OK] Priorites: LOW->Basse, MEDIUM->Moyenne, HIGH->Haute, URGENT->Urgente
+   [OK] Labels UI en francais
+   [OK] Messages d'erreur en francais
+
+================================================================================
+                              CE QUI RESTE A FAIRE
+================================================================================
+
+1. MIGRATIONS PRISMA (URGENT)
+-----------------------------
+   [ ] Arreter le backend
+   [ ] Executer: npx prisma generate
+   [ ] Executer: npx prisma migrate dev --name add_ticket_contact_fields
+   [ ] Redemarrer le backend
+
+   -> Cela active les champs: contactName, contactEmail, contactPhone, companyName
+      sur les tickets crees manuellement
+
+2. UPLOAD FICHIERS (BACKEND)
+----------------------------
+   [ ] Lier les fichiers uploades aux tickets
+   [ ] Lier les fichiers aux messages
+   [ ] Stocker les attachments dans la base (table Attachment)
+   [ ] Servir les fichiers via une route /uploads/:filename
+
+3. ESPACE CLIENT (frontend-client)
+----------------------------------
+   [ ] Interface client pour creer des tickets
+   [ ] Suivi des tickets par le client
+   [ ] Conversation client-agent
+   [ ] Authentification client
+
+4. NOTIFICATIONS TEMPS REEL
+---------------------------
+   [ ] Implementer WebSocket/Socket.io
+   [ ] Notifications push en temps reel
+   [ ] Mise a jour automatique de la liste des tickets
+
+5. EMAILS
+---------
+   [ ] Envoi d'email a la creation d'un ticket
+   [ ] Notification email sur nouveau message
+   [ ] Templates d'emails personnalisables
+
+6. RAPPORTS / EXPORTS
+---------------------
+   [ ] Export CSV/Excel des tickets
+   [ ] Rapports de performance des agents
+   [ ] Statistiques avancees
+
+7. AMELIORATIONS UI
+-------------------
+   [ ] Theme sombre (dark mode)
+   [ ] Personnalisation des colonnes du tableau
+   [ ] Raccourcis clavier
+   [ ] Recherche globale avancee
+
+================================================================================
+                              FICHIERS CLES
+================================================================================
+
+BACKEND:
+--------
+- apps/backend/src/routes/admin.routes.ts    -> Routes API admin
+- apps/backend/src/routes/client.routes.ts   -> Routes API client
+- apps/backend/src/routes/index.ts           -> Router principal
+- apps/backend/src/middlewares/auth.middleware.ts -> Authentification
+- apps/backend/src/services/ticket.service.ts -> Logique tickets
+- apps/backend/prisma/schema.prisma          -> Schema base de donnees
+
+FRONTEND ADMIN:
+---------------
+- apps/frontend-admin/src/App.tsx            -> Routes React
+- apps/frontend-admin/src/services/api.ts    -> Client API
+- apps/frontend-admin/src/contexts/AuthContext.tsx -> Contexte auth
+- apps/frontend-admin/src/components/AdminDashboard.tsx -> Dashboard
+- apps/frontend-admin/src/components/TicketDetail.tsx -> Detail ticket
+- apps/frontend-admin/src/components/layout/AdminSidebar.tsx -> Navigation
+- apps/frontend-admin/src/components/tickets/CreateTicket.tsx -> Creation ticket
+
+================================================================================
+                              COMMANDES UTILES
+================================================================================
+
+# Demarrer le backend
+cd apps/backend
+npm run dev
+
+# Demarrer le frontend admin
+cd apps/frontend-admin
+npm run dev
+
+# Migrations Prisma
+cd apps/backend
+npx prisma generate
+npx prisma migrate dev --name <nom_migration>
+npx prisma studio  # Interface graphique BDD
+
+# Build production
+cd apps/frontend-admin
+npm run build
+
+================================================================================
+                              VARIABLES D'ENVIRONNEMENT
+================================================================================
+
+Backend (.env):
+---------------
+DATABASE_URL=postgresql://user:password@localhost:5432/kly_sav
+JWT_SECRET=votre_secret_jwt
+JWT_REFRESH_SECRET=votre_refresh_secret
+PORT=3000
+
+Frontend Admin (.env):
+----------------------
+VITE_API_URL=http://localhost:3000/api
+
+================================================================================
+                              NOTES IMPORTANTES
+================================================================================
+
+1. Le backend doit etre arrete pour executer les migrations Prisma
+   (fichiers verrouilles sinon)
+
+2. Les roles disponibles:
+   - ADMIN: Acces complet
+   - SUPERVISOR: Acces complet sauf gestion utilisateurs
+   - AGENT: Voit uniquement ses tickets assignes
+   - CLIENT: Acces espace client uniquement
+
+3. Les fichiers uploades sont stockes localement dans /uploads
+   En production, utiliser un service cloud (S3, etc.)
+
+4. Le refresh token permet de renouveler l'access token sans
+   redemander le mot de passe
+
+================================================================================
+                              FIN DU DOCUMENT
+================================================================================

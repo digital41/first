@@ -24,6 +24,11 @@ export async function createTicket(
       status: 'OPEN',
       priority: (data.priority as TicketPriority) || 'MEDIUM',
       tags: data.tags || [],
+      // Champs de contact (pour création manuelle)
+      contactName: data.contactName,
+      contactEmail: data.contactEmail,
+      contactPhone: data.contactPhone,
+      companyName: data.companyName,
     },
     include: {
       order: true,

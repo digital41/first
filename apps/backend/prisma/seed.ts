@@ -88,27 +88,43 @@ async function main() {
   console.log(`  ✅ Client: ${customer2.email}`);
 
   // ============================================
-  // 3. ORDERS
+  // 3. ORDERS (Compatible SAGE 100: BC, BL, FA)
   // ============================================
   console.log('\n📦 Creating orders...');
 
   const order1 = await prisma.order.create({
     data: {
       orderNumber: 'BC-2024-001234',
+      blNumber: 'BL-2024-001234',
+      faNumber: 'FA-2024-001234',
       customerEmail: customer1.email,
       customerPhone: customer1.phone,
+      customerName: 'Jean Bernard',
+      companyName: 'ACME Industries',
+      sageRef: 'SAGE-001234',
+      orderDate: new Date('2024-01-15'),
+      totalAmount: 1250.00,
+      status: 'LIVREE',
     },
   });
-  console.log(`  ✅ Commande: ${order1.orderNumber}`);
+  console.log(`  ✅ Commande: ${order1.orderNumber} (BL: ${order1.blNumber}, FA: ${order1.faNumber})`);
 
   const order2 = await prisma.order.create({
     data: {
       orderNumber: 'BC-2024-005678',
+      blNumber: 'BL-2024-005678',
+      // Pas de FA pour cette commande (commande non facturée)
       customerEmail: customer2.email,
       customerPhone: customer2.phone,
+      customerName: 'Sophie Leroy',
+      companyName: 'Tech Solutions',
+      sageRef: 'SAGE-005678',
+      orderDate: new Date('2024-01-20'),
+      totalAmount: 3500.00,
+      status: 'EN_COURS',
     },
   });
-  console.log(`  ✅ Commande: ${order2.orderNumber}`);
+  console.log(`  ✅ Commande: ${order2.orderNumber} (BL: ${order2.blNumber})`);
 
   // ============================================
   // 4. SLA CONFIG
@@ -419,29 +435,33 @@ async function main() {
   // SUMMARY
   // ============================================
   console.log('\n');
-  console.log('╔════════════════════════════════════════════╗');
-  console.log('║          🌱 SEEDING COMPLETE               ║');
-  console.log('╠════════════════════════════════════════════╣');
-  console.log('║  Users:                                    ║');
-  console.log('║  • Admin: admin@klygroupe.com              ║');
-  console.log('║  • Agent: marie.dupont@klygroupe.com       ║');
-  console.log('║  • Agent: pierre.martin@klygroupe.com      ║');
-  console.log('║  • Client: jean.bernard@acme.fr            ║');
-  console.log('║  • Client: sophie.leroy@techsolutions.fr   ║');
-  console.log('╠════════════════════════════════════════════╣');
-  console.log('║  Password (admin/agents): Admin@2024!      ║');
-  console.log('║                           Agent@2024!      ║');
-  console.log('╠════════════════════════════════════════════╣');
-  console.log('║  Data created:                             ║');
-  console.log('║  • 5 users (1 admin, 2 agents, 2 clients)  ║');
-  console.log('║  • 2 orders                                ║');
-  console.log('║  • 3 tickets                               ║');
-  console.log('║  • 10 chat messages                        ║');
-  console.log('║  • 5 history entries                       ║');
-  console.log('║  • 2 notifications                         ║');
-  console.log('║  • 4 SLA configs                           ║');
-  console.log('║  • 3 canned responses                      ║');
-  console.log('╚════════════════════════════════════════════╝');
+  console.log('╔════════════════════════════════════════════════════════════╗');
+  console.log('║                  🌱 SEEDING COMPLETE                       ║');
+  console.log('╠════════════════════════════════════════════════════════════╣');
+  console.log('║  ADMIN LOGIN:                                              ║');
+  console.log('║  • Email: admin@klygroupe.com  Pwd: Admin@2024!            ║');
+  console.log('║  • Email: marie.dupont@klygroupe.com  Pwd: Agent@2024!     ║');
+  console.log('║  • Email: pierre.martin@klygroupe.com  Pwd: Agent@2024!   ║');
+  console.log('╠════════════════════════════════════════════════════════════╣');
+  console.log('║  CLIENT LOGIN (SAGE 100 References):                       ║');
+  console.log('║  Client 1 (Jean Bernard):                                  ║');
+  console.log('║  • BC: BC-2024-001234                                      ║');
+  console.log('║  • BL: BL-2024-001234                                      ║');
+  console.log('║  • FA: FA-2024-001234                                      ║');
+  console.log('║  Client 2 (Sophie Leroy):                                  ║');
+  console.log('║  • BC: BC-2024-005678                                      ║');
+  console.log('║  • BL: BL-2024-005678                                      ║');
+  console.log('╠════════════════════════════════════════════════════════════╣');
+  console.log('║  Data created:                                             ║');
+  console.log('║  • 5 users (1 admin, 2 agents, 2 clients)                  ║');
+  console.log('║  • 2 orders (with BC/BL/FA references)                     ║');
+  console.log('║  • 3 tickets                                               ║');
+  console.log('║  • 10 chat messages                                        ║');
+  console.log('║  • 5 history entries                                       ║');
+  console.log('║  • 2 notifications                                         ║');
+  console.log('║  • 4 SLA configs                                           ║');
+  console.log('║  • 3 canned responses                                      ║');
+  console.log('╚════════════════════════════════════════════════════════════╝');
 }
 
 main()

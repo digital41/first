@@ -37,9 +37,15 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface AdminDashboardProps {
   onNavigateToUsers?: () => void;
+  initialFilters?: TicketFilters;
+  pageTitle?: string;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToUsers }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  onNavigateToUsers,
+  initialFilters = {},
+  pageTitle,
+}) => {
   const { user } = useAuth();
 
   // State
@@ -50,7 +56,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToUsers }) =>
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [filters, setFilters] = useState<TicketFilters>({});
+  const [filters, setFilters] = useState<TicketFilters>(initialFilters);
   const [searchTerm, setSearchTerm] = useState('');
 
   // New feature states
@@ -185,6 +191,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToUsers }) =>
     return colors[status] || 'bg-slate-100 text-slate-600';
   };
 
+  const getStatusLabel = (status: TicketStatus): string => {
+    const labels: Record<TicketStatus, string> = {
+      OPEN: 'Ouvert',
+      IN_PROGRESS: 'En cours',
+      WAITING_CUSTOMER: 'Attente client',
+      RESOLVED: 'Résolu',
+      CLOSED: 'Fermé',
+      ESCALATED: 'Escaladé',
+      REOPENED: 'Réouvert',
+    };
+    return labels[status] || status;
+  };
+
   const getPriorityColor = (priority: TicketPriority) => {
     const colors: Record<TicketPriority, string> = {
       LOW: 'bg-slate-100 text-slate-600',
@@ -193,6 +212,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToUsers }) =>
       URGENT: 'bg-red-100 text-red-600',
     };
     return colors[priority] || 'bg-slate-100 text-slate-600';
+  };
+
+  const getPriorityLabel = (priority: TicketPriority): string => {
+    const labels: Record<TicketPriority, string> = {
+      LOW: 'Basse',
+      MEDIUM: 'Moyenne',
+      HIGH: 'Haute',
+      URGENT: 'Urgente',
+    };
+    return labels[priority] || priority;
   };
 
   // Si un ticket est sélectionné, afficher le détail
@@ -215,6 +244,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToUsers }) =>
 
   return (
     <div className="max-w-7xl mx-auto p-6">
+      {/* Page Title */}
+      {pageTitle && (
+        <h1 className="text-2xl font-bold text-slate-800 mb-6">{pageTitle}</h1>
+      )}
+
       {/* Agent Workload - Horizontal bar at top (visible only for ADMIN/SUPERVISOR) */}
       {isManagerRole && (
         <div className="mb-4">
@@ -409,12 +443,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToUsers }) =>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(ticket.status)}`}>
-                            {ticket.status}
+                            {getStatusLabel(ticket.status)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(ticket.priority)}`}>
-                            {ticket.priority}
+                            {getPriorityLabel(ticket.priority)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
