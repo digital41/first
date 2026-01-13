@@ -1,0 +1,337 @@
+// ============================================
+// PRISMA SCHEMA - KLY SAV Platform
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  CUSTOMER
+  AGENT
+  SUPERVISOR
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  RESOLVED
+  CLOSED
+  ESCALATED
+  REOPENED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum IssueType {
+  TECHNICAL
+  DELIVERY
+  BILLING
+  OTHER
+}
+
+enum AttachmentContext {
+  TICKET
+  MESSAGE
+}
+
+enum TicketAction {
+  CREATED
+  UPDATED
+  ASSIGNED
+  UNASSIGNED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  ESCALATED
+  REOPENED
+  CLOSED
+  NOTE_ADDED
+}
+
+enum NotificationType {
+  MESSAGE
+  MENTION
+  TICKET_UPDATE
+  SLA_WARNING
+  SLA_BREACH
+}
+
+// ============================================
+// MODEL: USER
+// ============================================
+
+model User {
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  phone       String?
+  displayName String
+  role        UserRole @default(CUSTOMER)
+
+  passwordHash String?
+
+  lastSeenAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations Ticket
+  tickets         Ticket[] @relation("CustomerTickets")
+  assignedTickets Ticket[] @relation("AssignedTickets")
+
+  // Relations Chat
+  messages     ChatMessage[]
+  mentionsIn   ChatMessage[] @relation("MessageMentions")
+
+  // Notifications
+  notifications Notification[]
+
+  // Historique
+  historyActor TicketHistory[] @relation("HistoryActor")
+
+  // Canned responses usage
+  cannedResponsesUsed CannedResponseUse[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// ============================================
+// MODEL: ORDER
+// ============================================
+
+model Order {
+  id            String   @id @default(cuid())
+  orderNumber   String   @unique
+  customerEmail String?
+  customerPhone String?
+  createdAt     DateTime @default(now())
+
+  tickets Ticket[]
+
+  @@index([orderNumber])
+  @@index([customerEmail])
+}
+
+// ============================================
+// MODEL: TICKET
+// ============================================
+
+model Ticket {
+  id          String         @id @default(cuid())
+  title       String
+  description String?
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  issueType   IssueType      @default(OTHER)
+
+  // SLA
+  slaDeadline  DateTime?
+  slaBreached  Boolean @default(false)
+
+  // Tags
+  tags String[] @default([])
+
+  // Customer
+  customerId String?
+  customer   User? @relation("CustomerTickets", fields: [customerId], references: [id], onDelete: SetNull)
+
+  // Agent assigne
+  assignedToId String?
+  assignedTo   User? @relation("AssignedTickets", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Commande liee
+  orderId String?
+  order   Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Relations
+  messages    ChatMessage[]
+  attachments Attachment[]
+  history     TicketHistory[]
+  cannedResponsesUsed CannedResponseUse[]
+
+  // Satisfaction
+  satisfactionScore Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([assignedToId])
+  @@index([assignedToId, status])
+  @@index([status, priority])
+  @@index([slaDeadline])
+  @@index([createdAt])
+}
+
+// ============================================
+// MODEL: CHAT MESSAGE
+// ============================================
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  content   String
+  readBy    Json?
+
+  createdAt DateTime @default(now())
+
+  // Mentions @user
+  mentions  User[]   @relation("MessageMentions")
+
+  // Pieces jointes
+  attachments Attachment[]
+
+  @@index([ticketId])
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+}
+
+// ============================================
+// MODEL: ATTACHMENT
+// ============================================
+
+model Attachment {
+  id        String            @id @default(cuid())
+  context   AttachmentContext
+
+  url       String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+
+  ticketId  String?
+  ticket    Ticket?     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  messageId String?
+  message   ChatMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([messageId])
+  @@index([context, ticketId])
+  @@index([context, messageId])
+}
+
+// ============================================
+// MODEL: TICKET HISTORY
+// ============================================
+
+model TicketHistory {
+  id        String       @id @default(cuid())
+  ticketId  String
+  ticket    Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  actorId   String?
+  actor     User?        @relation("HistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  action    TicketAction
+  field     String?
+  oldValue  String?
+  newValue  String?
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([ticketId, createdAt])
+  @@index([actorId])
+  @@index([actorId, createdAt])
+}
+
+// ============================================
+// MODEL: SLA CONFIG
+// ============================================
+
+model SlaConfig {
+  id                 String         @id @default(cuid())
+  priority           TicketPriority
+  issueType          IssueType?
+
+  firstResponseTime  Int // minutes
+  resolutionTime     Int // minutes
+
+  @@unique([priority, issueType])
+}
+
+// ============================================
+// MODEL: NOTIFICATION
+// ============================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  ticketId  String?
+  messageId String?
+  payload   Json?
+
+  isRead    Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// ============================================
+// MODEL: CANNED RESPONSE
+// ============================================
+
+model CannedResponse {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  tags      String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation usage
+  uses CannedResponseUse[]
+
+  @@index([tags])
+}
+
+// ============================================
+// MODEL: CANNED RESPONSE USE
+// ============================================
+
+model CannedResponseUse {
+  id               String   @id @default(cuid())
+  ticketId         String
+  ticket           Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  cannedResponseId String
+  cannedResponse   CannedResponse @relation(fields: [cannedResponseId], references: [id], onDelete: Cascade)
+
+  usedById         String?
+  usedBy           User?   @relation(fields: [usedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([ticketId, createdAt])
+  @@index([cannedResponseId])
+}

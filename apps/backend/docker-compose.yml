@@ -1,0 +1,77 @@
+# ============================================
+# DOCKER COMPOSE - Services de développement
+# ============================================
+# Usage: docker-compose up -d
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: kly-sav-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kly_user
+      POSTGRES_PASSWORD: kly_password
+      POSTGRES_DB: kly_sav
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kly_user -d kly_sav"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (pour sessions, cache, rate limiting)
+  redis:
+    image: redis:7-alpine
+    container_name: kly-sav-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Interface d'administration PostgreSQL (optionnel)
+  adminer:
+    image: adminer:4
+    container_name: kly-sav-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  postgres_data:
+  redis_data:
+
+# ============================================
+# Pour utiliser avec le backend:
+#
+# 1. Lancer les services:
+#    docker-compose up -d
+#
+# 2. Configurer .env:
+#    DATABASE_URL="postgresql://kly_user:kly_password@localhost:5432/kly_sav?schema=public"
+#
+# 3. Initialiser la base:
+#    npm run db:push
+#    npm run db:seed
+#
+# 4. Accéder à Adminer (interface web):
+#    http://localhost:8080
+#    Serveur: postgres
+#    Utilisateur: kly_user
+#    Mot de passe: kly_password
+#    Base: kly_sav
+# ============================================
