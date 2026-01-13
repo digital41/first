@@ -171,12 +171,15 @@ export async function listTickets(
 }
 
 /**
- * Met à jour un ticket (admin/agent)
+ * Met à jour un ticket
+ * - Clients: peuvent seulement réouvrir leurs propres tickets
+ * - Agents/Admins: accès complet
  */
 export async function updateTicket(
   ticketId: string,
   data: UpdateTicketDto,
-  updatedBy: string
+  updatedBy: string,
+  userRole?: string
 ): Promise<Ticket> {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -184,6 +187,22 @@ export async function updateTicket(
 
   if (!ticket) {
     throw AppError.notFound('Ticket non trouvé');
+  }
+
+  // Vérification pour les clients
+  if (userRole === 'CUSTOMER') {
+    // Les clients ne peuvent modifier que leurs propres tickets
+    if (ticket.customerId !== updatedBy) {
+      throw AppError.forbidden('Vous ne pouvez pas modifier ce ticket');
+    }
+    // Les clients ne peuvent que réouvrir un ticket résolu/fermé
+    if (data.status && data.status !== 'REOPENED') {
+      throw AppError.forbidden('Vous pouvez uniquement réouvrir un ticket');
+    }
+    // Les clients ne peuvent pas modifier d'autres champs
+    if (data.priority || data.assignedToId !== undefined || data.title || data.description !== undefined || data.tags) {
+      throw AppError.forbidden('Modification non autorisée');
+    }
   }
 
   // Prépare les changements d'historique

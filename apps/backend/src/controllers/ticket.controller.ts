@@ -98,7 +98,9 @@ export async function list(
 
 /**
  * PUT /api/tickets/:id
- * Met à jour un ticket (admin/agent uniquement)
+ * Met à jour un ticket
+ * - Clients: peuvent seulement réouvrir leurs propres tickets
+ * - Agents/Admins: accès complet
  */
 export async function update(
   req: AuthenticatedRequest,
@@ -109,7 +111,8 @@ export async function update(
     const ticket = await ticketService.updateTicket(
       req.params.id as string,
       req.body,
-      req.user.id
+      req.user.id,
+      req.user.role
     );
 
     sendSuccess(res, ticket, 'Ticket mis à jour');

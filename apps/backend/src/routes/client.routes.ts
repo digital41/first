@@ -31,6 +31,9 @@ router.get('/tickets', auth, ticketController.list as unknown as RequestHandler)
 // Voir un ticket spécifique (le middleware vérifie que c'est bien le sien)
 router.get('/tickets/:id', auth, ticketController.getOne as unknown as RequestHandler);
 
+// Mettre à jour un ticket (réouverture par le client)
+router.put('/tickets/:id', auth, ticketController.update as unknown as RequestHandler);
+
 // ============================================
 // MESSAGES CLIENT
 // ============================================
