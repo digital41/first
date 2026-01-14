@@ -357,7 +357,7 @@ export const notificationsApi = {
 
   // Mark as read
   markAsRead: async (ids: string[]): Promise<void> => {
-    await api.put('/client/notifications/read', { ids });
+    await api.put('/client/notifications/read', { notificationIds: ids });
   },
 
   // Mark all as read

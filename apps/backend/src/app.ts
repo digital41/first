@@ -3,6 +3,8 @@ import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import fs from 'fs';
 
 import { config } from './config/index.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
@@ -11,6 +13,7 @@ import routes from './routes/index.js';
 import { initializeSocket } from './websocket/index.js';
 import { startSlaCronJobs, stopSlaCronJobs } from './services/sla.service.js';
 import { verifyEmailConfig } from './services/email.service.js';
+import { UPLOAD_DIR } from './config/multer.js';
 
 // ============================================
 // APPLICATION EXPRESS + HTTP SERVER
@@ -57,6 +60,10 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Servir les fichiers uploadés
+const uploadsPath = path.resolve(UPLOAD_DIR);
+app.use('/uploads', express.static(uploadsPath));
+
 // Logging des requêtes en développement
 if (config.isDevelopment) {
   app.use((req, _res, next) => {
@@ -84,6 +91,13 @@ app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
   try {
+    // Créer le dossier uploads s'il n'existe pas
+    const uploadsDir = path.resolve(UPLOAD_DIR);
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      console.log(`📁 Dossier uploads créé: ${uploadsDir}`);
+    }
+
     // Connexion à la base de données
     await connectDatabase();
 

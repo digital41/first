@@ -18,6 +18,7 @@ import {
 import { ticketsApi, messagesApi, uploadApi } from '@/services/api';
 import { socketService } from '@/services/socket';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import {
   Ticket,
   TicketMessage,
@@ -29,13 +30,14 @@ import {
   ISSUE_TYPE_LABELS
 } from '@/types';
 import { StatusBadge, PriorityBadge, IssueTypeBadge, PageLoading, SLABadge } from '@/components/common';
-import { formatDateTime, formatMessageTime, formatRelativeTime, formatFileSize, cn, getInitials } from '@/utils/helpers';
+import { formatDateTime, formatMessageTime, formatRelativeTime, formatFileSize, formatTicketNumber, cn, getInitials } from '@/utils/helpers';
 
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { markTicketNotificationsAsRead } = useNotificationContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -70,6 +72,13 @@ export function TicketDetailPage() {
 
     fetchData();
   }, [id, navigate]);
+
+  // Mark ticket notifications as read when entering the page
+  useEffect(() => {
+    if (id && ticket) {
+      markTicketNotificationsAsRead(id);
+    }
+  }, [id, ticket, markTicketNotificationsAsRead]);
 
   // Real-time updates
   useEffect(() => {
@@ -212,7 +221,7 @@ export function TicketDetailPage() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm font-medium text-primary-600">
-                #{ticket.ticketNumber}
+                {formatTicketNumber(ticket.ticketNumber)}
               </span>
               <StatusBadge status={ticket.status} />
               <PriorityBadge priority={ticket.priority} />

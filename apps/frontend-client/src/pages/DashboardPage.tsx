@@ -9,16 +9,19 @@ import {
   ArrowRight,
   Package,
   MessageSquare,
-  TrendingUp
+  TrendingUp,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { ticketsApi, ordersApi } from '@/services/api';
 import { Ticket as TicketType, Order, TicketStats } from '@/types';
 import { StatusBadge, PriorityBadge, PageLoading } from '@/components/common';
-import { formatRelativeTime, formatTicketNumber } from '@/utils/helpers';
+import { formatRelativeTime, formatTicketNumber, cn } from '@/utils/helpers';
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const { getUnreadCountForTicket } = useNotificationContext();
   const [stats, setStats] = useState<TicketStats | null>(null);
   const [recentTickets, setRecentTickets] = useState<TicketType[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -172,31 +175,43 @@ export function DashboardPage() {
                 <p>Aucun ticket pour le moment</p>
               </div>
             ) : (
-              recentTickets.map((ticket) => (
-                <Link
-                  key={ticket.id}
-                  to={`/tickets/${ticket.id}`}
-                  className="block p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-sm font-medium text-primary-600">
-                          {formatTicketNumber(ticket.ticketNumber)}
-                        </span>
-                        <StatusBadge status={ticket.status} size="sm" />
+              recentTickets.map((ticket) => {
+                const unreadCount = getUnreadCountForTicket(ticket.id);
+                return (
+                  <Link
+                    key={ticket.id}
+                    to={`/tickets/${ticket.id}`}
+                    className={cn(
+                      'block p-4 hover:bg-gray-50 transition-colors',
+                      unreadCount > 0 && 'bg-primary-50/50 border-l-4 border-primary-500'
+                    )}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="text-sm font-medium text-primary-600">
+                            {formatTicketNumber(ticket.ticketNumber)}
+                          </span>
+                          {unreadCount > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                              <Bell size={10} />
+                              {unreadCount}
+                            </span>
+                          )}
+                          <StatusBadge status={ticket.status} size="sm" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {ticket.title}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatRelativeTime(ticket.createdAt)}
+                        </p>
                       </div>
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {ticket.title}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatRelativeTime(ticket.createdAt)}
-                      </p>
+                      <PriorityBadge priority={ticket.priority} size="sm" />
                     </div>
-                    <PriorityBadge priority={ticket.priority} size="sm" />
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>

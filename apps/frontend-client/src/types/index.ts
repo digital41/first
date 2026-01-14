@@ -164,7 +164,7 @@ export interface TicketHistory {
 // Notification
 export interface Notification {
   id: string;
-  userId: string;
+  userId?: string;
   type: NotificationType;
   ticketId?: string;
   ticket?: Ticket;
@@ -172,6 +172,18 @@ export interface Notification {
   message?: TicketMessage;
   isRead: boolean;
   createdAt: string;
+  // Champs pour les notifications temps réel
+  title?: string;
+  body?: string;
+  payload?: {
+    action?: string;
+    title?: string;
+    content?: string;
+    senderName?: string;
+    newStatus?: string;
+    newPriority?: string;
+    [key: string]: unknown;
+  };
 }
 
 // Knowledge Base

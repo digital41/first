@@ -61,9 +61,10 @@ export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-// Ticket number formatting
-export function formatTicketNumber(number: string): string {
-  return `#${number}`;
+// Ticket number formatting - Format: SAV-XXXXX
+export function formatTicketNumber(number: string | number): string {
+  const num = typeof number === 'string' ? parseInt(number, 10) : number;
+  return `SAV-${String(num).padStart(5, '0')}`;
 }
 
 // Order number formatting

@@ -8,16 +8,17 @@ import {
   Clock,
   X
 } from 'lucide-react';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { Notification, NotificationType } from '@/types';
-import { formatRelativeTime, cn } from '@/utils/helpers';
+import { formatRelativeTime, formatTicketNumber, cn } from '@/utils/helpers';
 
 interface NotificationItemProps {
   notification: Notification;
   onMarkRead: () => void;
+  onClick: () => void;
 }
 
-function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
+function NotificationItem({ notification, onMarkRead, onClick }: NotificationItemProps) {
   const getIcon = () => {
     switch (notification.type) {
       case NotificationType.MESSAGE:
@@ -33,7 +34,32 @@ function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
     }
   };
 
+  const getTitle = () => {
+    // Utiliser le titre du payload ou direct si disponible
+    if (notification.payload?.title) return notification.payload.title;
+    if (notification.title) return notification.title;
+
+    // Fallback basé sur le type
+    switch (notification.type) {
+      case NotificationType.MESSAGE:
+        return 'Nouveau message';
+      case NotificationType.TICKET_UPDATE:
+        return 'Ticket mis à jour';
+      case NotificationType.SLA_WARNING:
+        return 'Avertissement SLA';
+      case NotificationType.SLA_BREACH:
+        return 'Violation SLA';
+      default:
+        return 'Notification';
+    }
+  };
+
   const getMessage = () => {
+    // Utiliser le contenu du payload ou body si disponible
+    if (notification.payload?.content) return notification.payload.content;
+    if (notification.body) return notification.body;
+
+    // Fallback basé sur le type
     switch (notification.type) {
       case NotificationType.MESSAGE:
         return 'Nouveau message sur votre ticket';
@@ -55,10 +81,15 @@ function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
     return '#';
   };
 
+  const handleClick = () => {
+    onMarkRead();
+    onClick();
+  };
+
   return (
     <Link
       to={getLink()}
-      onClick={onMarkRead}
+      onClick={handleClick}
       className={cn(
         'flex items-start p-4 hover:bg-gray-50 transition-colors border-l-4',
         notification.isRead
@@ -68,12 +99,15 @@ function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
     >
       <div className="shrink-0 mr-3 mt-0.5">{getIcon()}</div>
       <div className="flex-1 min-w-0">
-        <p className={cn('text-sm', notification.isRead ? 'text-gray-700' : 'font-medium text-gray-900')}>
+        <p className={cn('text-sm font-medium', notification.isRead ? 'text-gray-700' : 'text-gray-900')}>
+          {getTitle()}
+        </p>
+        <p className={cn('text-sm mt-0.5', notification.isRead ? 'text-gray-500' : 'text-gray-600')}>
           {getMessage()}
         </p>
         {notification.ticket && (
-          <p className="text-sm text-gray-500 truncate mt-0.5">
-            #{notification.ticket.ticketNumber} - {notification.ticket.title}
+          <p className="text-xs text-gray-400 truncate mt-0.5">
+            {formatTicketNumber(notification.ticket.ticketNumber)} - {notification.ticket.title}
           </p>
         )}
         <p className="text-xs text-gray-400 mt-1">
@@ -90,7 +124,7 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps) {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotificationContext();
 
   if (!isOpen) return null;
 
@@ -159,6 +193,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
                       markAsRead([notification.id]);
                     }
                   }}
+                  onClick={onClose}
                 />
               ))}
             </div>

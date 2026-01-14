@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, MessageSquare, Paperclip } from 'lucide-react';
+import { Clock, MessageSquare, Paperclip, Bell } from 'lucide-react';
 import { Ticket } from '@/types';
 import { StatusBadge, PriorityBadge, IssueTypeBadge } from '@/components/common';
 import { formatRelativeTime, formatTicketNumber, cn } from '@/utils/helpers';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -11,16 +12,29 @@ interface TicketCardProps {
 }
 
 export function TicketCard({ ticket, variant = 'default' }: TicketCardProps) {
+  const { getUnreadCountForTicket } = useNotificationContext();
+  const unreadCount = getUnreadCountForTicket(ticket.id);
+
   if (variant === 'compact') {
     return (
       <Link
         to={`/tickets/${ticket.id}`}
-        className="block p-3 hover:bg-gray-50 rounded-lg transition-colors"
+        className={cn(
+          'block p-3 hover:bg-gray-50 rounded-lg transition-colors relative',
+          unreadCount > 0 && 'bg-primary-50/50 border-l-2 border-primary-500'
+        )}
       >
         <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-medium text-primary-600">
-            {formatTicketNumber(ticket.ticketNumber)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-primary-600">
+              {formatTicketNumber(ticket.ticketNumber)}
+            </span>
+            {unreadCount > 0 && (
+              <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                {unreadCount}
+              </span>
+            )}
+          </div>
           <StatusBadge status={ticket.status} size="sm" />
         </div>
         <p className="text-sm text-gray-900 truncate">{ticket.title}</p>
@@ -32,13 +46,24 @@ export function TicketCard({ ticket, variant = 'default' }: TicketCardProps) {
   return (
     <Link
       to={`/tickets/${ticket.id}`}
-      className="block card p-4 hover:shadow-md transition-shadow"
+      className={cn(
+        'block card p-4 hover:shadow-md transition-shadow',
+        unreadCount > 0 && 'ring-2 ring-primary-500 ring-offset-1'
+      )}
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <span className="text-sm font-medium text-primary-600">
-            {formatTicketNumber(ticket.ticketNumber)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-primary-600">
+              {formatTicketNumber(ticket.ticketNumber)}
+            </span>
+            {unreadCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                <Bell size={10} />
+                {unreadCount}
+              </span>
+            )}
+          </div>
           <h3 className="font-semibold text-gray-900 mt-1">{ticket.title}</h3>
         </div>
         <StatusBadge status={ticket.status} />

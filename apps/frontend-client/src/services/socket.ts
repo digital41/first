@@ -22,22 +22,22 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket connected');
+      console.log('[Socket] Connected - registering listeners');
+      // Re-register all listeners AFTER connection is established
+      this.listeners.forEach((callbacks, event) => {
+        callbacks.forEach((callback) => {
+          this.socket?.on(event, callback);
+        });
+      });
+      console.log(`[Socket] Registered ${this.listeners.size} event types`);
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason);
+      console.log('[Socket] Disconnected:', reason);
     });
 
     this.socket.on('error', (error) => {
-      console.error('Socket error:', error);
-    });
-
-    // Re-register all listeners
-    this.listeners.forEach((callbacks, event) => {
-      callbacks.forEach((callback) => {
-        this.socket?.on(event, callback);
-      });
+      console.error('[Socket] Error:', error);
     });
   }
 
@@ -53,10 +53,13 @@ class SocketService {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)?.add(callback);
+    console.log(`[Socket] Listener added for '${event}' (connected: ${this.socket?.connected})`);
 
+    // If already connected, register immediately
     if (this.socket?.connected) {
       this.socket.on(event, callback);
     }
+    // Otherwise, it will be registered when 'connect' event fires
   }
 
   off(event: string, callback: (...args: unknown[]) => void): void {

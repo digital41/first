@@ -7,12 +7,14 @@ import {
   ChevronDown,
   Ticket,
   Clock,
-  ArrowUpDown
+  ArrowUpDown,
+  Bell
 } from 'lucide-react';
 import { ticketsApi } from '@/services/api';
 import { Ticket as TicketType, TicketStatus, TicketPriority, IssueType, PaginatedResponse } from '@/types';
 import { StatusBadge, PriorityBadge, IssueTypeBadge, PageLoading, EmptyState } from '@/components/common';
 import { formatRelativeTime, formatTicketNumber, cn } from '@/utils/helpers';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 
 export function TicketsListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,6 +23,7 @@ export function TicketsListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState<string | false>(false);
+  const { getUnreadCountForTicket } = useNotificationContext();
 
   // Get filters from URL
   const statusFilter = searchParams.get('status') as TicketStatus | null;
@@ -235,64 +238,86 @@ export function TicketsListPage() {
           </div>
 
           {/* Tickets */}
-          {tickets.map((ticket) => (
-            <Link
-              key={ticket.id}
-              to={`/tickets/${ticket.id}`}
-              className="block hover:bg-gray-50 transition-colors"
-            >
-              {/* Mobile layout */}
-              <div className="lg:hidden p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <span className="text-sm font-medium text-primary-600">
-                      {formatTicketNumber(ticket.ticketNumber)}
-                    </span>
-                    <h3 className="font-medium text-gray-900 mt-1">{ticket.title}</h3>
-                  </div>
-                  <StatusBadge status={ticket.status} size="sm" />
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <PriorityBadge priority={ticket.priority} size="sm" />
-                  <IssueTypeBadge issueType={ticket.issueType} size="sm" />
-                  <span className="text-xs text-gray-500 ml-auto">
-                    {formatRelativeTime(ticket.createdAt)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Desktop layout */}
-              <div className="hidden lg:grid lg:grid-cols-12 gap-4 px-6 py-4 items-center">
-                <div className="col-span-4">
-                  <span className="text-sm font-medium text-primary-600">
-                    {formatTicketNumber(ticket.ticketNumber)}
-                  </span>
-                  <h3 className="font-medium text-gray-900 truncate">{ticket.title}</h3>
-                  <p className="text-sm text-gray-500 truncate mt-0.5">{ticket.description}</p>
-                </div>
-                <div className="col-span-2">
-                  <StatusBadge status={ticket.status} />
-                </div>
-                <div className="col-span-2">
-                  <PriorityBadge priority={ticket.priority} />
-                </div>
-                <div className="col-span-2">
-                  <IssueTypeBadge issueType={ticket.issueType} />
-                </div>
-                <div className="col-span-2 text-right">
-                  <p className="text-sm text-gray-900">
-                    {formatRelativeTime(ticket.createdAt)}
-                  </p>
-                  {ticket.slaDeadline && (
-                    <div className="flex items-center justify-end text-xs text-gray-500 mt-1">
-                      <Clock size={12} className="mr-1" />
-                      SLA
+          {tickets.map((ticket) => {
+            const unreadCount = getUnreadCountForTicket(ticket.id);
+            return (
+              <Link
+                key={ticket.id}
+                to={`/tickets/${ticket.id}`}
+                className={cn(
+                  'block hover:bg-gray-50 transition-colors',
+                  unreadCount > 0 && 'bg-primary-50/50 border-l-4 border-primary-500'
+                )}
+              >
+                {/* Mobile layout */}
+                <div className="lg:hidden p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-primary-600">
+                          {formatTicketNumber(ticket.ticketNumber)}
+                        </span>
+                        {unreadCount > 0 && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                            <Bell size={10} />
+                            {unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-medium text-gray-900 mt-1">{ticket.title}</h3>
                     </div>
-                  )}
+                    <StatusBadge status={ticket.status} size="sm" />
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <PriorityBadge priority={ticket.priority} size="sm" />
+                    <IssueTypeBadge issueType={ticket.issueType} size="sm" />
+                    <span className="text-xs text-gray-500 ml-auto">
+                      {formatRelativeTime(ticket.createdAt)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+
+                {/* Desktop layout */}
+                <div className="hidden lg:grid lg:grid-cols-12 gap-4 px-6 py-4 items-center">
+                  <div className="col-span-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-primary-600">
+                        {formatTicketNumber(ticket.ticketNumber)}
+                      </span>
+                      {unreadCount > 0 && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                          <Bell size={10} />
+                          {unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-medium text-gray-900 truncate">{ticket.title}</h3>
+                    <p className="text-sm text-gray-500 truncate mt-0.5">{ticket.description}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <StatusBadge status={ticket.status} />
+                  </div>
+                  <div className="col-span-2">
+                    <PriorityBadge priority={ticket.priority} />
+                  </div>
+                  <div className="col-span-2">
+                    <IssueTypeBadge issueType={ticket.issueType} />
+                  </div>
+                  <div className="col-span-2 text-right">
+                    <p className="text-sm text-gray-900">
+                      {formatRelativeTime(ticket.createdAt)}
+                    </p>
+                    {ticket.slaDeadline && (
+                      <div className="flex items-center justify-end text-xs text-gray-500 mt-1">
+                        <Clock size={12} className="mr-1" />
+                        SLA
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
 

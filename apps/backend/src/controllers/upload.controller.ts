@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import { prisma } from '../config/database.js';
+import { config } from '../config/index.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { AttachmentContext } from '@prisma/client';
 
@@ -31,7 +32,8 @@ export async function uploadFiles(
     const attachmentContext: AttachmentContext =
       context === 'MESSAGE' ? AttachmentContext.MESSAGE : AttachmentContext.TICKET;
 
-    // Créer les attachments en BDD
+    // Créer les attachments en BDD avec URL complète
+    const baseUrl = config.server.baseUrl;
     const attachments = await Promise.all(
       files.map(async (file) => {
         return prisma.attachment.create({
@@ -39,8 +41,8 @@ export async function uploadFiles(
             context: attachmentContext,
             ticketId: ticketId || null,
             messageId: messageId || null,
-            fileName: file.filename,
-            url: `/uploads/${file.filename}`,
+            fileName: file.originalname, // Utiliser le nom original du fichier
+            url: `${baseUrl}/uploads/${file.filename}`,
             mimeType: file.mimetype,
             sizeBytes: file.size,
           },

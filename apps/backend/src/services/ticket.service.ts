@@ -2,6 +2,11 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middlewares/error.middleware.js';
 import type { CreateTicketDto, UpdateTicketDto, PaginatedResult, PaginationParams } from '../types/index.js';
 import type { Ticket, TicketStatus, TicketPriority, IssueType } from '@prisma/client';
+import {
+  notifyStatusChange,
+  notifyTicketAssigned,
+  createNotification,
+} from './notification.service.js';
 
 // ============================================
 // SERVICE DE GESTION DES TICKETS
@@ -47,6 +52,36 @@ export async function createTicket(
       newValue: 'OPEN',
     },
   });
+
+  // Notifier les admins et superviseurs du nouveau ticket
+  const staffToNotify = await prisma.user.findMany({
+    where: {
+      role: { in: ['ADMIN', 'SUPERVISOR'] },
+    },
+    select: { id: true },
+  });
+
+  const issueTypeLabels: Record<string, string> = {
+    TECHNICAL: 'Technique',
+    DELIVERY: 'Livraison',
+    BILLING: 'Facturation',
+    OTHER: 'Autre',
+  };
+
+  for (const staff of staffToNotify) {
+    await createNotification({
+      userId: staff.id,
+      type: 'TICKET_UPDATE',
+      ticketId: ticket.id,
+      payload: {
+        action: 'created',
+        title: 'Nouveau ticket',
+        content: `Nouveau ticket "${ticket.title}" (${issueTypeLabels[ticket.issueType] || ticket.issueType}).`,
+        issueType: ticket.issueType,
+        priority: ticket.priority,
+      },
+    });
+  }
 
   return ticket;
 }
@@ -273,6 +308,67 @@ export async function updateTicket(
       ? [prisma.ticketHistory.createMany({ data: historyEntries })]
       : []),
   ]);
+
+  // ============================================
+  // ENVOI DES NOTIFICATIONS
+  // ============================================
+
+  // Notification changement de statut
+  if (data.status && data.status !== ticket.status) {
+    // Notifier le client si ce n'est pas lui qui a fait le changement
+    if (ticket.customerId && ticket.customerId !== updatedBy) {
+      await notifyStatusChange(ticketId, ticket.customerId, data.status, ticket.title);
+    }
+    // Notifier l'agent assigné si ce n'est pas lui qui a fait le changement
+    if (ticket.assignedToId && ticket.assignedToId !== updatedBy) {
+      await notifyStatusChange(ticketId, ticket.assignedToId, data.status, ticket.title);
+    }
+  }
+
+  // Notification nouvelle assignation
+  if (data.assignedToId && data.assignedToId !== ticket.assignedToId) {
+    await notifyTicketAssigned(ticketId, data.assignedToId, ticket.title);
+  }
+
+  // Notification changement de priorité
+  if (data.priority && data.priority !== ticket.priority) {
+    const priorityLabels: Record<string, string> = {
+      LOW: 'Basse',
+      MEDIUM: 'Moyenne',
+      HIGH: 'Haute',
+      URGENT: 'Urgente',
+    };
+
+    // Notifier l'agent assigné
+    if (ticket.assignedToId && ticket.assignedToId !== updatedBy) {
+      await createNotification({
+        userId: ticket.assignedToId,
+        type: 'TICKET_UPDATE',
+        ticketId,
+        payload: {
+          action: 'priority_changed',
+          title: 'Priorité modifiée',
+          content: `Le ticket "${ticket.title}" est maintenant en priorité ${priorityLabels[data.priority] || data.priority}.`,
+          newPriority: data.priority,
+        },
+      });
+    }
+
+    // Notifier le client si la priorité devient urgente
+    if (data.priority === 'URGENT' && ticket.customerId && ticket.customerId !== updatedBy) {
+      await createNotification({
+        userId: ticket.customerId,
+        type: 'TICKET_UPDATE',
+        ticketId,
+        payload: {
+          action: 'priority_changed',
+          title: 'Ticket marqué urgent',
+          content: `Votre ticket "${ticket.title}" a été marqué comme urgent.`,
+          newPriority: data.priority,
+        },
+      });
+    }
+  }
 
   return updatedTicket;
 }

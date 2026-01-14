@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import { prisma } from '../config/database.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { broadcastTicketUpdate } from '../websocket/index.js';
+import { notifyNewMessage } from '../services/notification.service.js';
 
 // ============================================
 // CONTROLLER MESSAGES
@@ -90,11 +91,15 @@ export async function createMessage(
 ): Promise<void> {
   try {
     const ticketId = req.params.ticketId as string;
-    const { content, isInternal = false } = req.body;
+    const { content, isInternal = false, attachments = [] } = req.body;
     const { id: userId, role } = req.user;
 
-    if (!content || content.trim().length === 0) {
-      res.status(400).json({ success: false, error: 'Contenu requis' });
+    // Permettre message vide si des pièces jointes sont présentes
+    const hasContent = content && content.trim().length > 0;
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+
+    if (!hasContent && !hasAttachments) {
+      res.status(400).json({ success: false, error: 'Contenu ou pièce jointe requis' });
       return;
     }
 
@@ -102,9 +107,13 @@ export async function createMessage(
     const isStaff = ['ADMIN', 'SUPERVISOR', 'AGENT'].includes(role);
     const finalIsInternal = isStaff ? Boolean(isInternal) : false;
 
-    // Vérifier ticket existe
+    // Vérifier ticket existe et récupérer les infos pour les notifications
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
+      include: {
+        customer: { select: { id: true, displayName: true } },
+        assignedTo: { select: { id: true, displayName: true } },
+      },
     });
 
     if (!ticket) {
@@ -117,7 +126,7 @@ export async function createMessage(
       data: {
         ticketId,
         authorId: userId,
-        content: content.trim(),
+        content: hasContent ? content.trim() : '',
         isInternal: finalIsInternal,
       },
       include: {
@@ -127,11 +136,37 @@ export async function createMessage(
       },
     });
 
+    // Lier les pièces jointes au message
+    let linkedAttachments: Array<{ id: string; fileName: string; url: string; mimeType: string }> = [];
+    if (hasAttachments) {
+      await prisma.attachment.updateMany({
+        where: {
+          id: { in: attachments },
+        },
+        data: {
+          messageId: message.id,
+          context: 'MESSAGE',
+        },
+      });
+
+      // Récupérer les pièces jointes liées pour les inclure dans la réponse
+      linkedAttachments = await prisma.attachment.findMany({
+        where: { messageId: message.id },
+        select: { id: true, fileName: true, url: true, mimeType: true },
+      });
+    }
+
     // Mettre à jour le ticket
     await prisma.ticket.update({
       where: { id: ticketId },
       data: { updatedAt: new Date() },
     });
+
+    // Préparer la réponse avec les pièces jointes
+    const messageWithAttachments = {
+      ...message,
+      attachments: linkedAttachments,
+    };
 
     // Broadcast via WebSocket (ne pas broadcaster les notes internes au client)
     if (!finalIsInternal) {
@@ -142,12 +177,43 @@ export async function createMessage(
         content: message.content,
         isInternal: message.isInternal,
         createdAt: message.createdAt.toISOString(),
+        attachments: linkedAttachments,
       });
+    }
+
+    // ============================================
+    // ENVOI DES NOTIFICATIONS
+    // ============================================
+    const senderName = message.author.displayName || 'Utilisateur';
+
+    // Si le message n'est pas interne
+    if (!finalIsInternal) {
+      // Si l'expéditeur est un membre du staff -> notifier le client
+      if (isStaff && ticket.customerId && ticket.customerId !== userId) {
+        await notifyNewMessage(
+          ticketId,
+          message.id,
+          ticket.customerId,
+          senderName,
+          ticket.title
+        );
+      }
+
+      // Si l'expéditeur est le client -> notifier l'agent assigné
+      if (role === 'CUSTOMER' && ticket.assignedToId) {
+        await notifyNewMessage(
+          ticketId,
+          message.id,
+          ticket.assignedToId,
+          senderName,
+          ticket.title
+        );
+      }
     }
 
     res.status(201).json({
       success: true,
-      data: message,
+      data: messageWithAttachments,
     });
   } catch (error) {
     console.error('[Create Message Error]', error);

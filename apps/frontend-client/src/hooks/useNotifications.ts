@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Notification } from '@/types';
 import { notificationsApi } from '@/services/api';
 import { socketService } from '@/services/socket';
@@ -7,6 +7,10 @@ import { useAuth } from '@/contexts/AuthContext';
 interface UseNotificationsReturn {
   notifications: Notification[];
   unreadCount: number;
+  unreadByTicket: Map<string, number>;
+  hasUnreadForTicket: (ticketId: string) => boolean;
+  getUnreadCountForTicket: (ticketId: string) => number;
+  markTicketNotificationsAsRead: (ticketId: string) => Promise<void>;
   isLoading: boolean;
   error: string | null;
   markAsRead: (ids: string[]) => Promise<void>;
@@ -20,6 +24,7 @@ export function useNotifications(): UseNotificationsReturn {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const seenIdsRef = useRef<Set<string>>(new Set());
 
   const fetchNotifications = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -31,6 +36,8 @@ export function useNotifications(): UseNotificationsReturn {
         notificationsApi.getAll(),
         notificationsApi.getUnreadCount(),
       ]);
+      // Mettre à jour les IDs connus
+      seenIdsRef.current = new Set(notifs.map((n: Notification) => n.id));
       setNotifications(notifs);
       setUnreadCount(count);
     } catch (err) {
@@ -48,15 +55,40 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Real-time updates
   useEffect(() => {
-    const handleNewNotification = (notification: unknown) => {
-      setNotifications((prev) => [notification as Notification, ...prev]);
-      setUnreadCount((prev) => prev + 1);
+    const handleNewNotification = (data: unknown) => {
+      // Le backend envoie: { id, type, title, body, ticketId, createdAt }
+      const incoming = data as Record<string, unknown>;
+      const notifId = incoming.id as string;
+
+      // Éviter les doublons via le ref
+      if (seenIdsRef.current.has(notifId)) {
+        console.log('[Notification] Doublon ignoré:', notifId);
+        return;
+      }
+
+      console.log('[Notification] Nouvelle notification reçue:', notifId);
+      seenIdsRef.current.add(notifId);
+
+      // Construire l'objet Notification avec isRead = false
+      const notif: Notification = {
+        id: notifId,
+        type: incoming.type as Notification['type'],
+        ticketId: incoming.ticketId as string | undefined,
+        title: incoming.title as string | undefined,
+        body: incoming.body as string | undefined,
+        isRead: false,
+        createdAt: incoming.createdAt as string || new Date().toISOString(),
+      };
+
+      setNotifications((prev) => [notif, ...prev]);
+      setUnreadCount((count) => count + 1);
     };
 
-    socketService.on('notification:new', handleNewNotification);
+    // Le backend émet 'notification' (pas 'notification:new')
+    socketService.on('notification', handleNewNotification);
 
     return () => {
-      socketService.off('notification:new', handleNewNotification);
+      socketService.off('notification', handleNewNotification);
     };
   }, []);
 
@@ -82,9 +114,47 @@ export function useNotifications(): UseNotificationsReturn {
     }
   }, []);
 
+  // Computed: map of ticketId -> unread count
+  const unreadByTicket = useMemo(() => {
+    const map = new Map<string, number>();
+    notifications
+      .filter((n) => !n.isRead && n.ticketId)
+      .forEach((n) => {
+        const current = map.get(n.ticketId!) || 0;
+        map.set(n.ticketId!, current + 1);
+      });
+    return map;
+  }, [notifications]);
+
+  const hasUnreadForTicket = useCallback(
+    (ticketId: string) => unreadByTicket.has(ticketId),
+    [unreadByTicket]
+  );
+
+  const getUnreadCountForTicket = useCallback(
+    (ticketId: string) => unreadByTicket.get(ticketId) || 0,
+    [unreadByTicket]
+  );
+
+  const markTicketNotificationsAsRead = useCallback(
+    async (ticketId: string) => {
+      const ticketNotifIds = notifications
+        .filter((n) => !n.isRead && n.ticketId === ticketId)
+        .map((n) => n.id);
+      if (ticketNotifIds.length > 0) {
+        await markAsRead(ticketNotifIds);
+      }
+    },
+    [notifications, markAsRead]
+  );
+
   return {
     notifications,
     unreadCount,
+    unreadByTicket,
+    hasUnreadForTicket,
+    getUnreadCountForTicket,
+    markTicketNotificationsAsRead,
     isLoading,
     error,
     markAsRead,
