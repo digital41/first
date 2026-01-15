@@ -3,7 +3,6 @@ import {
   UserPlus,
   ArrowUpCircle,
   CheckCircle,
-  XCircle,
   Loader2,
   X,
 } from 'lucide-react';

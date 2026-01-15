@@ -9,14 +9,12 @@ import {
   Settings,
   Volume2,
   VolumeX,
-  ChevronDown,
   ExternalLink,
 } from 'lucide-react';
 import {
   SLAAlert,
   SLAAlertLevel,
   SLAConfig,
-  formatTimeRemaining,
   getSLALevelColor,
 } from '../../lib/slaAlertTypes';
 

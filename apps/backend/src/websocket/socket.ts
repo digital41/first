@@ -72,6 +72,21 @@ export function initializeSocket(httpServer: HTTPServer): typeof io {
     });
 
     // ─────────────────────────────────────────
+    // TICKET ROOM (alias pour frontend)
+    // ─────────────────────────────────────────
+    authSocket.on('join:ticket', async (data: { ticketId: string }) => {
+      const room = `ticket:${data.ticketId}`;
+      await authSocket.join(room);
+      console.log(`[Socket] ${authSocket.userDisplayName} joined ${room}`);
+    });
+
+    authSocket.on('leave:ticket', async (data: { ticketId: string }) => {
+      const room = `ticket:${data.ticketId}`;
+      await authSocket.leave(room);
+      console.log(`[Socket] ${authSocket.userDisplayName} left ${room}`);
+    });
+
+    // ─────────────────────────────────────────
     // DÉCONNEXION
     // ─────────────────────────────────────────
     authSocket.on('disconnect', (reason) => {
@@ -152,6 +167,77 @@ export function broadcastTicketAssigned(
     agentId,
     agentName,
   });
+}
+
+/**
+ * Notifie que l'IA est en train d'écrire
+ */
+export function broadcastAITyping(
+  ticketId: string,
+  isTyping: boolean
+): void {
+  if (!io) return;
+  console.log(`[Socket] Broadcasting ai:typing to room ticket:${ticketId} - isTyping: ${isTyping}`);
+  io.to(`ticket:${ticketId}`).emit('ai:typing', {
+    ticketId,
+    isTyping,
+  });
+}
+
+/**
+ * Émet un nouveau message à tous les membres de la room
+ */
+export function broadcastNewMessage(
+  ticketId: string,
+  message: {
+    id: string;
+    authorId?: string;
+    authorName?: string;
+    content: string;
+    isInternal: boolean;
+    createdAt: string;
+    attachments?: Array<{ id: string; fileName: string; url: string; mimeType?: string }>;
+    isAI?: boolean;
+    offerHumanHelp?: boolean;
+  }
+): void {
+  if (!io) return;
+  console.log(`[Socket] Broadcasting message:new to room ticket:${ticketId}`, message.id);
+  io.to(`ticket:${ticketId}`).emit('message:new', message);
+}
+
+/**
+ * Notifie l'agent assigné qu'il doit prendre en charge le ticket
+ * (transfert de l'IA vers un humain)
+ */
+export function notifyHumanTakeover(
+  agentId: string,
+  ticketData: {
+    ticketId: string;
+    ticketNumber: string;
+    customerName: string;
+    message?: string;
+  }
+): void {
+  if (!io) return;
+  console.log(`[Socket] Human takeover notification for agent ${agentId} - ticket ${ticketData.ticketId}`);
+  io.to(`user:${agentId}`).emit('admin:human_takeover', ticketData);
+}
+
+/**
+ * Notifie tous les admins/superviseurs qu'un ticket nécessite une prise en charge
+ */
+export function broadcastHumanTakeoverToAdmins(
+  ticketData: {
+    ticketId: string;
+    ticketNumber: string;
+    customerName: string;
+    message?: string;
+  }
+): void {
+  if (!io) return;
+  console.log(`[Socket] Broadcasting human takeover to all admins - ticket ${ticketData.ticketId}`);
+  io.emit('admin:human_takeover', ticketData);
 }
 
 export { io };

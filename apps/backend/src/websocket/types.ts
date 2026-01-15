@@ -19,6 +19,10 @@ export interface ClientToServerEvents {
   'chat:typing': (data: { ticketId: string; isTyping: boolean }) => void;
   'chat:read': (data: { ticketId: string; messageIds: string[] }) => void;
 
+  // Ticket room (alias pour compatibilité frontend)
+  'join:ticket': (data: { ticketId: string }) => void;
+  'leave:ticket': (data: { ticketId: string }) => void;
+
   // Presence
   'presence:online': () => void;
   'presence:offline': () => void;
@@ -32,12 +36,36 @@ export interface ServerToClientEvents {
   'chat:read': (data: { ticketId: string; userId: string; messageIds: string[] }) => void;
   'chat:history': (data: { ticketId: string; messages: ChatMessagePayload[] }) => void;
 
+  // Messages (compatible avec frontend)
+  'message:new': (data: {
+    id: string;
+    authorId?: string;
+    authorName?: string;
+    content: string;
+    isInternal: boolean;
+    createdAt: string;
+    attachments?: Array<{ id: string; fileName: string; url: string; mimeType?: string }>;
+    isAI?: boolean;
+    offerHumanHelp?: boolean;
+  }) => void;
+
+  // AI
+  'ai:typing': (data: { ticketId: string; isTyping: boolean }) => void;
+
   // Ticket updates
   'ticket:updated': (data: { ticketId: string; field: string; value: unknown }) => void;
   'ticket:assigned': (data: { ticketId: string; agentId: string; agentName: string }) => void;
 
   // Notifications
   'notification': (data: NotificationPayload) => void;
+
+  // Admin events
+  'admin:human_takeover': (data: {
+    ticketId: string;
+    ticketNumber: string;
+    customerName: string;
+    message?: string;
+  }) => void;
 
   // Errors
   'error': (data: { code: string; message: string }) => void;

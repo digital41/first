@@ -14,7 +14,6 @@ import {
 import useTicketTimer from '../../hooks/useTicketTimer';
 import {
   formatDuration,
-  formatDurationLong,
   TimeEntry,
 } from '../../lib/timeTrackingTypes';
 
@@ -40,8 +39,6 @@ const TimeTrackingPanel: React.FC<TimeTrackingPanelProps> = ({
     isRunning,
     currentTime,
     stats,
-    start,
-    stop,
     toggle,
     reset,
     addManualEntry,

@@ -15,7 +15,8 @@ import {
   OrderDetailPage,
   FAQPage,
   KnowledgeBasePage,
-  ContactPage
+  ContactPage,
+  ProfilePage
 } from '@/pages';
 
 // Protected route wrapper
@@ -170,10 +171,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <div className="text-center py-12">
-                <h1 className="text-2xl font-bold text-gray-900">Mon profil</h1>
-                <p className="text-gray-500 mt-2">Page en cours de développement</p>
-              </div>
+              <ProfilePage />
             </MainLayout>
           </ProtectedRoute>
         }

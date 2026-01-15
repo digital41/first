@@ -82,8 +82,12 @@ model User {
   phone       String?
   displayName String
   role        UserRole @default(CUSTOMER)
+  isActive    Boolean  @default(true)
 
   passwordHash String?
+
+  // SAGE 100 - Code client (pour les customers)
+  customerCode String?  @unique  // Code compte client SAGE (ex: COCO001)
 
   lastSeenAt  DateTime?
   createdAt   DateTime @default(now())
@@ -108,6 +112,7 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@index([customerCode])
 }
 
 // ============================================
@@ -123,6 +128,7 @@ model Order {
   faNumber      String?  @unique  // FA - Facture
 
   // Client
+  customerCode  String?           // Code compte client SAGE (ex: COCO001)
   customerEmail String?
   customerPhone String?
   customerName  String?
@@ -138,13 +144,47 @@ model Order {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Relations
   tickets Ticket[]
+  lines   OrderLine[]
 
   @@index([orderNumber])
   @@index([blNumber])
   @@index([faNumber])
+  @@index([customerCode])
   @@index([customerEmail])
   @@index([sageRef])
+}
+
+// ============================================
+// MODEL: ORDER LINE (Lignes de commande SAGE)
+// ============================================
+
+model OrderLine {
+  id            String   @id @default(cuid())
+
+  // Relation avec la commande
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Données SAGE
+  lineNumber    Int               // DL_Ligne - Numéro de ligne
+  productCode   String?           // AR_Ref - Référence article
+  productName   String            // DL_Design - Désignation
+  quantity      Decimal           // DL_Qte - Quantité
+  unitPrice     Decimal?          // DL_PrixUnitaire - Prix unitaire HT
+  totalHT       Decimal?          // DL_MontantHT - Montant total HT
+
+  // Infos article supplémentaires
+  unit          String?           // Unité de mesure
+  discount      Decimal?          // Remise en %
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([orderId, lineNumber])
+  @@index([orderId])
+  @@index([productCode])
 }
 
 // ============================================
@@ -176,6 +216,12 @@ model Ticket {
   contactEmail String?
   contactPhone String?
   companyName  String?
+
+  // Informations équipement (pour problèmes techniques)
+  serialNumber      String?   // Numéro de série
+  equipmentModel    String?   // Modèle de l'équipement
+  equipmentBrand    String?   // Marque
+  errorCode         String?   // Code d'erreur affiché
 
   // Agent assigne
   assignedToId String?

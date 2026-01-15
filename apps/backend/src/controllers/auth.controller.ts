@@ -9,7 +9,26 @@ import type { AuthenticatedRequest } from '../types/index.js';
 
 /**
  * POST /api/auth/login
- * Connexion client par références SAGE 100 (BC, BL ou FA)
+ * Connexion client par code compte client SAGE 100
+ */
+export async function loginByCustomerCode(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { customerCode } = req.body;
+    const result = await authService.loginByCustomerCode(customerCode);
+
+    sendSuccess(res, result, 'Connexion réussie');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/auth/login/reference
+ * Connexion client par références SAGE 100 (BC, BL ou FA) - Ancienne méthode
  */
 export async function loginByReference(
   req: Request,
@@ -92,4 +111,30 @@ export async function me(
   res: Response
 ): Promise<void> {
   sendSuccess(res, { user: req.user });
+}
+
+/**
+ * PUT /api/auth/me
+ * Met à jour le profil de l'utilisateur connecté
+ */
+export async function updateProfile(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user.id;
+    const { displayName, phone, currentPassword, newPassword } = req.body;
+
+    const result = await authService.updateProfile(userId, {
+      displayName,
+      phone,
+      currentPassword,
+      newPassword,
+    });
+
+    sendSuccess(res, { user: result }, 'Profil mis à jour');
+  } catch (error) {
+    next(error);
+  }
 }

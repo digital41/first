@@ -82,6 +82,7 @@ export interface CreateUserData {
   displayName: string;
   role: UserRole;
   phone?: string;
+  password?: string;
   profile?: Partial<OperatorProfile>;
 }
 
@@ -90,6 +91,7 @@ export interface UpdateUserData {
   role?: UserRole;
   status?: UserStatus;
   phone?: string;
+  password?: string;
   profile?: Partial<OperatorProfile>;
 }
 

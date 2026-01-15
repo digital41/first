@@ -12,6 +12,7 @@ import { errorHandler, notFoundHandler } from './middlewares/error.middleware.js
 import routes from './routes/index.js';
 import { initializeSocket } from './websocket/index.js';
 import { startSlaCronJobs, stopSlaCronJobs } from './services/sla.service.js';
+import { startSageSyncJob, stopSageSyncJob } from './services/sage-sync.service.js';
 import { verifyEmailConfig } from './services/email.service.js';
 import { UPLOAD_DIR } from './config/multer.js';
 
@@ -60,9 +61,13 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Servir les fichiers uploadés
+// Servir les fichiers uploadés avec headers CORS appropriés
 const uploadsPath = path.resolve(UPLOAD_DIR);
-app.use('/uploads', express.static(uploadsPath));
+app.use('/uploads', (_req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static(uploadsPath));
 
 // Logging des requêtes en développement
 if (config.isDevelopment) {
@@ -107,6 +112,9 @@ async function bootstrap(): Promise<void> {
     // Démarrage des jobs cron SLA
     startSlaCronJobs();
 
+    // Démarrage de la synchronisation SAGE (toutes les 5 minutes)
+    startSageSyncJob();
+
     // Démarrage du serveur HTTP + WebSocket
     httpServer.listen(config.server.port, () => {
       console.log('');
@@ -136,6 +144,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
   // Arrêt des jobs cron
   stopSlaCronJobs();
+  stopSageSyncJob();
 
   // Déconnexion base de données
   await disconnectDatabase();

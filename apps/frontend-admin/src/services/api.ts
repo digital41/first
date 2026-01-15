@@ -10,6 +10,7 @@ import {
   Notification,
   UpdateTicketPayload,
   CannedResponse,
+  Attachment,
 } from '../types';
 
 // ============================================
@@ -192,6 +193,21 @@ export const AdminApi = {
     return response.user;
   },
 
+  async updateProfile(data: {
+    displayName?: string;
+    phone?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }): Promise<User> {
+    const response = await fetchWithAuth<{ user: User }>('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    // Update local storage with new user data
+    TokenStorage.setUser(response.user);
+    return response.user;
+  },
+
   async logout(): Promise<void> {
     const refreshToken = TokenStorage.getRefreshToken();
     if (refreshToken) {
@@ -276,11 +292,12 @@ export const AdminApi = {
   async sendMessage(
     ticketId: string,
     content: string,
-    isInternal = false
+    isInternal = false,
+    attachmentIds: string[] = []
   ): Promise<TicketMessage> {
     return fetchWithAuth<TicketMessage>(`/admin/tickets/${ticketId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content, isInternal }),
+      body: JSON.stringify({ content, isInternal, attachments: attachmentIds }),
     });
   },
 
@@ -331,6 +348,7 @@ export const AdminApi = {
       role?: string;
       isActive?: boolean;
       phone?: string;
+      password?: string;
     }
   ): Promise<User> {
     const response = await fetchWithAuth<{ user: User }>(`/admin/users/${userId}`, {
@@ -384,6 +402,14 @@ export const AdminApi = {
     });
   },
 
+  async markNotificationsAsRead(notificationIds: string[]): Promise<void> {
+    if (notificationIds.length === 0) return;
+    await fetchWithAuth<void>('/admin/notifications/read', {
+      method: 'PUT',
+      body: JSON.stringify({ notificationIds }),
+    });
+  },
+
   async markAllNotificationsAsRead(): Promise<void> {
     await fetchWithAuth<void>('/admin/notifications/read-all', {
       method: 'PUT',
@@ -396,6 +422,389 @@ export const AdminApi = {
 
   async getCannedResponses(): Promise<CannedResponse[]> {
     return fetchWithAuth<CannedResponse[]>('/admin/canned-responses');
+  },
+
+  // ==========================================
+  // UPLOAD DE FICHIERS (Admin)
+  // ==========================================
+
+  async uploadFiles(files: File[]): Promise<Attachment[]> {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    const token = TokenStorage.getAccessToken();
+    const response = await fetch(`${API_BASE_URL}/admin/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new ApiError('Erreur lors de l\'upload', response.status, 'UPLOAD_ERROR');
+    }
+
+    const data = await response.json();
+    return data.data || data.attachments || data;
+  },
+
+  async deleteAttachment(attachmentId: string): Promise<void> {
+    await fetchWithAuth<void>(`/admin/upload/${attachmentId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // ==========================================
+  // IA - Assistant intelligent
+  // ==========================================
+
+  async generateAIResponse(ticketId: string, autoSave = false): Promise<{
+    message: string;
+    shouldEscalate: boolean;
+    confidence: number;
+    suggestedActions?: string[];
+    saved: boolean;
+  }> {
+    return fetchWithAuth<{
+      message: string;
+      shouldEscalate: boolean;
+      confidence: number;
+      suggestedActions?: string[];
+      saved: boolean;
+    }>('/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId, autoSave }),
+    });
+  },
+
+  async sendAIResponse(ticketId: string): Promise<{
+    message: string;
+    shouldEscalate: boolean;
+    confidence: number;
+    suggestedActions?: string[];
+  }> {
+    return fetchWithAuth<{
+      message: string;
+      shouldEscalate: boolean;
+      confidence: number;
+      suggestedActions?: string[];
+    }>(`/ai/respond/${ticketId}`, {
+      method: 'POST',
+    });
+  },
+
+  async analyzeCustomerMessage(ticketId: string, customerMessage: string): Promise<{
+    suggestedResponse: string;
+    shouldEscalate: boolean;
+    confidence: number;
+    suggestedActions?: string[];
+  }> {
+    return fetchWithAuth<{
+      suggestedResponse: string;
+      shouldEscalate: boolean;
+      confidence: number;
+      suggestedActions?: string[];
+    }>('/ai/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId, customerMessage }),
+    });
+  },
+
+  // ==========================================
+  // SAGE API (Lecture seule - optionnel)
+  // ==========================================
+
+  /**
+   * Vérifie le statut de la connexion SAGE
+   */
+  async getSageStatus(): Promise<{
+    enabled: boolean;
+    available: boolean;
+    message: string;
+  }> {
+    try {
+      const response = await fetchWithAuth<{
+        enabled: boolean;
+        available: boolean;
+        message: string;
+      }>('/sage/status');
+      return response;
+    } catch {
+      return { enabled: false, available: false, message: 'Erreur connexion SAGE' };
+    }
+  },
+
+  /**
+   * Récupère un client SAGE par son code
+   */
+  async getSageCustomer(customerCode: string): Promise<{
+    customerCode: string;
+    companyName: string;
+    contactName?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+  } | null> {
+    try {
+      const response = await fetchWithAuth<{
+        customerCode: string;
+        companyName: string;
+        contactName?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+        postalCode?: string;
+        city?: string;
+      } | null>(`/sage/customer/${customerCode}`);
+      return response;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Récupère les commandes d'un client SAGE
+   */
+  async getSageCustomerOrders(customerCode: string): Promise<Array<{
+    documentNumber: string;
+    documentType: number;
+    documentTypeLabel: string;
+    customerCode: string;
+    orderDate: string;
+    deliveryDate?: string;
+    reference?: string;
+    totalHT: number;
+    totalTTC: number;
+    status: string;
+  }>> {
+    try {
+      const response = await fetchWithAuth<Array<{
+        documentNumber: string;
+        documentType: number;
+        documentTypeLabel: string;
+        customerCode: string;
+        orderDate: string;
+        deliveryDate?: string;
+        reference?: string;
+        totalHT: number;
+        totalTTC: number;
+        status: string;
+      }>>(`/sage/customer/${customerCode}/orders`);
+      return response || [];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Récupère une commande SAGE par son numéro
+   */
+  async getSageOrder(orderNumber: string): Promise<{
+    documentNumber: string;
+    documentType: number;
+    documentTypeLabel: string;
+    customerCode: string;
+    orderDate: string;
+    deliveryDate?: string;
+    reference?: string;
+    totalHT: number;
+    totalTTC: number;
+    status: string;
+    lines?: Array<{
+      lineNumber: number;
+      productCode: string;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      totalHT: number;
+    }>;
+  } | null> {
+    try {
+      const response = await fetchWithAuth<{
+        documentNumber: string;
+        documentType: number;
+        documentTypeLabel: string;
+        customerCode: string;
+        orderDate: string;
+        deliveryDate?: string;
+        reference?: string;
+        totalHT: number;
+        totalTTC: number;
+        status: string;
+        lines?: Array<{
+          lineNumber: number;
+          productCode: string;
+          productName: string;
+          quantity: number;
+          unitPrice: number;
+          totalHT: number;
+        }>;
+      } | null>(`/sage/order/${orderNumber}`);
+      return response;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Recherche de clients SAGE
+   */
+  async searchSageCustomers(query: string): Promise<Array<{
+    customerCode: string;
+    companyName: string;
+    contactName?: string;
+    email?: string;
+    phone?: string;
+  }>> {
+    try {
+      if (!query || query.length < 2) return [];
+      const response = await fetchWithAuth<Array<{
+        customerCode: string;
+        companyName: string;
+        contactName?: string;
+        email?: string;
+        phone?: string;
+      }>>(`/sage/search/customers?q=${encodeURIComponent(query)}`);
+      return response || [];
+    } catch {
+      return [];
+    }
+  },
+
+  // ==========================================
+  // ASSISTANT IA OPÉRATEUR
+  // ==========================================
+
+  /**
+   * Obtenir une suggestion IA pour un ticket
+   */
+  async getAISuggestion(ticketId: string, query?: string): Promise<{
+    success: boolean;
+    suggestion: string;
+    draftResponse: string;
+    keyPoints: string[];
+    recommendedActions: string[];
+    customerSentiment: 'positive' | 'neutral' | 'negative' | 'frustrated';
+    urgencyAssessment: string;
+  }> {
+    const response = await fetchWithAuth<{ success: boolean; data: {
+      success: boolean;
+      suggestion: string;
+      draftResponse: string;
+      keyPoints: string[];
+      recommendedActions: string[];
+      customerSentiment: 'positive' | 'neutral' | 'negative' | 'frustrated';
+      urgencyAssessment: string;
+    } }>(`/admin/ai/suggest/${ticketId}`, {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    });
+    return response.data;
+  },
+
+  /**
+   * Analyser rapidement un ticket
+   */
+  async analyzeTicket(ticketId: string): Promise<{
+    ticketNumber: number;
+    issueType: string;
+    priority: string;
+    sentiment: string;
+    urgency: string;
+    messageCount: number;
+    customerMessageCount: number;
+    extractedInfo: {
+      serialNumber?: string;
+      equipmentModel?: string;
+      equipmentBrand?: string;
+      errorCode?: string;
+    };
+    lastCustomerMessage: string | null;
+  }> {
+    const response = await fetchWithAuth<{ success: boolean; data: {
+      ticketNumber: number;
+      issueType: string;
+      priority: string;
+      sentiment: string;
+      urgency: string;
+      messageCount: number;
+      customerMessageCount: number;
+      extractedInfo: {
+        serialNumber?: string;
+        equipmentModel?: string;
+        equipmentBrand?: string;
+        errorCode?: string;
+      };
+      lastCustomerMessage: string | null;
+    } }>(`/admin/ai/analyze/${ticketId}`, {
+      method: 'POST',
+    });
+    return response.data;
+  },
+
+  /**
+   * Résumé intelligent de la conversation par IA
+   */
+  async getConversationSummary(ticketId: string): Promise<{
+    ticketNumber: number;
+    summary: string;
+    keyIssues: string[];
+    customerMood: string;
+    nextSteps: string[];
+    resolutionProgress: number;
+  }> {
+    const response = await fetchWithAuth<{
+      success: boolean;
+      data: {
+        ticketNumber: number;
+        summary: string;
+        keyIssues: string[];
+        customerMood: string;
+        nextSteps: string[];
+        resolutionProgress: number;
+      };
+    }>(`/admin/ai/summary/${ticketId}`, {
+      method: 'POST',
+    });
+    return response.data;
+  },
+
+  /**
+   * Chat conversationnel avec l'assistant IA global
+   */
+  async chatWithAI(
+    message: string,
+    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ): Promise<{
+    message: string;
+    context: {
+      totalTickets: number;
+      slaBreached: number;
+      unassignedCount: number;
+      urgentCount: number;
+    };
+  }> {
+    const response = await fetchWithAuth<{
+      success: boolean;
+      data: {
+        message: string;
+        context: {
+          totalTickets: number;
+          slaBreached: number;
+          unassignedCount: number;
+          urgentCount: number;
+        };
+      }
+    }>('/admin/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, conversationHistory }),
+    });
+    return response.data;
   },
 };
 

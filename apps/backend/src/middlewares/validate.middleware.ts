@@ -68,7 +68,12 @@ export const cuidSchema = z.object({
   id: z.string().cuid(),
 });
 
-// Authentification par références SAGE 100
+// Authentification par code compte client SAGE 100
+export const loginByCustomerCodeSchema = z.object({
+  customerCode: z.string().min(1, 'Le code client est requis'),
+});
+
+// Authentification par références SAGE 100 (ancienne méthode)
 export const loginByReferenceSchema = z
   .object({
     orderNumber: z.string().min(1).optional(),  // BC - Bon de Commande

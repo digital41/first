@@ -15,9 +15,7 @@ import {
   MessageSquare,
   Tag,
   AlertCircle,
-  CheckCircle,
   Loader2,
-  Zap,
   Lock,
   Eye,
   EyeOff,
@@ -27,7 +25,6 @@ import {
   Download,
   ExternalLink,
   X,
-  Upload,
 } from 'lucide-react';
 
 // Types pour les fichiers attachés
@@ -221,16 +218,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
     return labels[status] || status;
   };
 
-  const getPriorityLabel = (priority: TicketPriority): string => {
-    const labels: Record<TicketPriority, string> = {
-      LOW: 'Basse',
-      MEDIUM: 'Moyenne',
-      HIGH: 'Haute',
-      URGENT: 'Urgente',
-    };
-    return labels[priority] || priority;
-  };
-
   return (
     <div className="max-w-6xl mx-auto p-6">
       {/* Header */}
@@ -247,7 +234,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
           {/* Macro Selector */}
           <MacroSelector
             ticket={ticket}
-            onMacroApplied={(macro, success) => {
+            onMacroApplied={(_macro, success) => {
               if (success) {
                 // Reload ticket data after macro execution
                 AdminApi.getTicketById(ticket.id).then(onUpdate).catch(console.error);
@@ -646,7 +633,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
               <select
                 value={ticket.assignedToId || ''}
                 onChange={(e) =>
-                  handleUpdateTicket({ assignedToId: e.target.value || null })
+                  handleUpdateTicket({ assignedToId: e.target.value || undefined })
                 }
                 disabled={isUpdating}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"

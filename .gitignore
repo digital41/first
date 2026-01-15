@@ -1,3 +1,11 @@
+# ============================================
+# FICHIERS SENSIBLES - NE JAMAIS COMMIT
+# ============================================
+.env
+.env.*
+!.env.example
+*.local
+
 # Logs
 logs
 *.log

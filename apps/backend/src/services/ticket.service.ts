@@ -7,6 +7,8 @@ import {
   notifyTicketAssigned,
   createNotification,
 } from './notification.service.js';
+import { AIService } from './ai.service.js';
+import { broadcastAITyping, broadcastNewMessage } from '../websocket/index.js';
 
 // ============================================
 // SERVICE DE GESTION DES TICKETS
@@ -19,10 +21,25 @@ export async function createTicket(
   data: CreateTicketDto,
   customerId?: string
 ): Promise<Ticket> {
+  // Valider orderId si fourni - doit exister dans la base locale
+  // Les numéros de commande SAGE (ex: F26010226) ne sont pas des IDs locaux
+  let validOrderId: string | undefined = undefined;
+  if (data.orderId) {
+    // Vérifier si l'orderId existe dans la base locale
+    const localOrder = await prisma.order.findUnique({
+      where: { id: data.orderId },
+      select: { id: true },
+    });
+    if (localOrder) {
+      validOrderId = localOrder.id;
+    }
+    // Si pas trouvé, c'est probablement un numéro SAGE - on ne l'utilise pas comme FK
+  }
+
   const ticket = await prisma.ticket.create({
     data: {
       customerId,
-      orderId: data.orderId,
+      orderId: validOrderId,
       title: data.title,
       description: data.description,
       issueType: data.issueType as IssueType,
@@ -34,6 +51,11 @@ export async function createTicket(
       contactEmail: data.contactEmail,
       contactPhone: data.contactPhone,
       companyName: data.companyName,
+      // Informations équipement
+      serialNumber: data.serialNumber,
+      equipmentModel: data.equipmentModel,
+      equipmentBrand: data.equipmentBrand,
+      errorCode: data.errorCode,
     },
     include: {
       order: true,
@@ -83,7 +105,87 @@ export async function createTicket(
     });
   }
 
+  // ============================================
+  // DÉCLENCHEMENT IA AUTOMATIQUE À LA CRÉATION
+  // ============================================
+  // L'IA commence la conversation immédiatement
+  triggerAIWelcome(ticket.id).catch(err => {
+    console.error('[AI Welcome] Erreur:', err);
+  });
+
   return ticket;
+}
+
+/**
+ * Déclenche un message de bienvenue IA dès la création du ticket
+ */
+async function triggerAIWelcome(ticketId: string): Promise<void> {
+  try {
+    // Petit délai pour que le ticket soit bien créé et que le WebSocket soit prêt
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Récupérer le contexte du ticket
+    const context = await AIService.getTicketContext(ticketId);
+    if (!context) {
+      console.log(`[AI Welcome] Ticket ${ticketId} non trouvé`);
+      return;
+    }
+
+    // Notifier que l'IA est en train d'écrire
+    broadcastAITyping(ticketId, true);
+
+    // Générer la réponse IA de bienvenue
+    console.log(`[AI Welcome] Génération message d'accueil pour ticket #${context.ticketNumber}...`);
+    const response = await AIService.generateResponse(context);
+
+    // Arrêter l'indicateur de frappe
+    broadcastAITyping(ticketId, false);
+
+    if (!response.success) {
+      console.error(`[AI Welcome] Échec génération pour ticket ${ticketId}`);
+      return;
+    }
+
+    // Sauvegarder le message IA
+    await AIService.saveAIMessage(ticketId, response.message, {
+      confidence: response.confidence,
+      shouldEscalate: response.shouldEscalate,
+      generatedAt: new Date().toISOString(),
+      auto: true,
+      isWelcome: true,
+    });
+
+    // Récupérer le message IA créé pour le broadcast
+    const aiMessage = await prisma.chatMessage.findFirst({
+      where: { ticketId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: {
+          select: { id: true, displayName: true, role: true },
+        },
+      },
+    });
+
+    if (aiMessage) {
+      // Broadcast via WebSocket
+      broadcastNewMessage(ticketId, {
+        id: aiMessage.id,
+        authorId: aiMessage.author?.id,
+        authorName: aiMessage.author?.displayName || 'Assistant IA KLY',
+        content: aiMessage.content,
+        isInternal: false,
+        createdAt: aiMessage.createdAt.toISOString(),
+        attachments: [],
+        isAI: true,
+        offerHumanHelp: false, // Pas de proposition humain au premier message
+      });
+    }
+
+    console.log(`[AI Welcome] Message d'accueil envoyé pour ticket #${context.ticketNumber}`);
+  } catch (error) {
+    broadcastAITyping(ticketId, false);
+    console.error('[AI Welcome] Erreur:', error);
+  }
 }
 
 /**
@@ -296,6 +398,11 @@ export async function updateTicket(
         ...(data.title && { title: data.title }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.tags && { tags: data.tags }),
+        // Informations équipement
+        ...(data.serialNumber !== undefined && { serialNumber: data.serialNumber }),
+        ...(data.equipmentModel !== undefined && { equipmentModel: data.equipmentModel }),
+        ...(data.equipmentBrand !== undefined && { equipmentBrand: data.equipmentBrand }),
+        ...(data.errorCode !== undefined && { errorCode: data.errorCode }),
       },
       include: {
         customer: true,

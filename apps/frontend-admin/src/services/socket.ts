@@ -1,35 +1,33 @@
 import { io, Socket } from 'socket.io-client';
-import { getAccessToken } from './api';
+import { TokenStorage } from './api';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
 
-class SocketService {
+class AdminSocketService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
-  private pendingRooms: Set<string> = new Set(); // Rooms en attente de connexion
+  private pendingRooms: Set<string> = new Set();
 
   connect(): void {
-    const token = getAccessToken();
+    const token = TokenStorage.getAccessToken();
     if (!token) {
-      console.log('[Socket] No token, cannot connect');
+      console.log('[AdminSocket] No token, cannot connect');
       return;
     }
 
-    // Si déjà connecté, ne rien faire
     if (this.socket?.connected) {
-      console.log('[Socket] Already connected');
+      console.log('[AdminSocket] Already connected');
       return;
     }
 
-    // Si socket existe mais déconnecté, le fermer d'abord
     if (this.socket) {
-      console.log('[Socket] Socket exists but disconnected, cleaning up');
+      console.log('[AdminSocket] Socket exists but disconnected, cleaning up');
       this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
 
-    console.log('[Socket] Creating new connection to', SOCKET_URL);
+    console.log('[AdminSocket] Creating new connection to', SOCKET_URL);
     this.socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
@@ -39,44 +37,42 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('[Socket] Connected successfully! Socket ID:', this.socket?.id);
-      // Re-register all listeners AFTER connection is established
+      console.log('[AdminSocket] Connected successfully! Socket ID:', this.socket?.id);
+
+      // Re-register all listeners
       this.listeners.forEach((callbacks, event) => {
         callbacks.forEach((callback) => {
           this.socket?.on(event, callback);
         });
       });
-      console.log(`[Socket] Registered ${this.listeners.size} event types`);
+      console.log(`[AdminSocket] Registered ${this.listeners.size} event types`);
 
-      // Rejoindre les rooms en attente
+      // Join pending rooms
       if (this.pendingRooms.size > 0) {
-        console.log(`[Socket] Joining ${this.pendingRooms.size} pending rooms:`, Array.from(this.pendingRooms));
+        console.log(`[AdminSocket] Joining ${this.pendingRooms.size} pending rooms`);
         this.pendingRooms.forEach((ticketId) => {
           this.socket?.emit('join:ticket', { ticketId });
-          console.log(`[Socket] Emitted join:ticket for ${ticketId}`);
         });
       }
+
+      // Subscribe to admin notifications
+      this.subscribeToAdminNotifications();
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('[Socket] Disconnected:', reason);
+      console.log('[AdminSocket] Disconnected:', reason);
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
-      console.log('[Socket] Reconnected after', attemptNumber, 'attempts');
-      // Rejoindre les rooms après reconnexion
+      console.log('[AdminSocket] Reconnected after', attemptNumber, 'attempts');
       this.pendingRooms.forEach((ticketId) => {
         this.socket?.emit('join:ticket', { ticketId });
-        console.log(`[Socket] Rejoined room ticket:${ticketId} after reconnect`);
       });
+      this.subscribeToAdminNotifications();
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('[Socket] Connection error:', error.message);
-    });
-
-    this.socket.on('error', (error) => {
-      console.error('[Socket] Error:', error);
+      console.error('[AdminSocket] Connection error:', error.message);
     });
   }
 
@@ -85,6 +81,7 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
     }
+    this.pendingRooms.clear();
   }
 
   on(event: string, callback: (...args: unknown[]) => void): void {
@@ -92,13 +89,11 @@ class SocketService {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)?.add(callback);
-    console.log(`[Socket] Listener added for '${event}' (connected: ${this.socket?.connected})`);
+    console.log(`[AdminSocket] Listener added for '${event}'`);
 
-    // If already connected, register immediately
     if (this.socket?.connected) {
       this.socket.on(event, callback);
     }
-    // Otherwise, it will be registered when 'connect' event fires
   }
 
   off(event: string, callback: (...args: unknown[]) => void): void {
@@ -112,40 +107,31 @@ class SocketService {
     }
   }
 
-  // Join a ticket room for real-time updates
   joinTicketRoom(ticketId: string): void {
-    // Ajouter à la liste des rooms en attente
     this.pendingRooms.add(ticketId);
-
     if (this.socket?.connected) {
       this.socket.emit('join:ticket', { ticketId });
-      console.log(`[Socket] Joined room ticket:${ticketId}`);
-    } else {
-      console.log(`[Socket] Room ticket:${ticketId} queued (waiting for connection)`);
+      console.log(`[AdminSocket] Joined room ticket:${ticketId}`);
     }
   }
 
-  // Leave a ticket room
   leaveTicketRoom(ticketId: string): void {
-    // Retirer de la liste des rooms en attente
     this.pendingRooms.delete(ticketId);
-
     if (this.socket?.connected) {
       this.socket.emit('leave:ticket', { ticketId });
-      console.log(`[Socket] Left room ticket:${ticketId}`);
+      console.log(`[AdminSocket] Left room ticket:${ticketId}`);
     }
   }
 
-  // Subscribe to notifications
-  subscribeToNotifications(): void {
+  subscribeToAdminNotifications(): void {
     this.emit('subscribe:notifications');
+    console.log('[AdminSocket] Subscribed to admin notifications');
   }
 
-  // Check connection status
   isConnected(): boolean {
     return this.socket?.connected ?? false;
   }
 }
 
-export const socketService = new SocketService();
-export default socketService;
+export const adminSocketService = new AdminSocketService();
+export default adminSocketService;

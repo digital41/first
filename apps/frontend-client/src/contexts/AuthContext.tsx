@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (reference: string) => Promise<void>;
+  login: (customerCode: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -49,10 +49,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  const login = useCallback(async (reference: string) => {
+  const login = useCallback(async (customerCode: string) => {
     setIsLoading(true);
     try {
-      const response = await authApi.loginByReference(reference);
+      const response = await authApi.loginByCustomerCode(customerCode);
       setUser(response.user);
       socketService.connect();
       socketService.subscribeToNotifications();

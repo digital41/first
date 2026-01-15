@@ -48,6 +48,8 @@ export function TicketDetailPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [showSuccess, setShowSuccess] = useState(location.state?.created);
+  const [isAITyping, setIsAITyping] = useState(false);
+  const [showHumanHelpButton, setShowHumanHelpButton] = useState(false);
 
   // Fetch ticket and messages
   useEffect(() => {
@@ -84,33 +86,58 @@ export function TicketDetailPage() {
   useEffect(() => {
     if (!id) return;
 
+    console.log(`[TicketDetail] Setting up WebSocket for ticket ${id}`);
     socketService.joinTicketRoom(id);
 
     const handleNewMessage = (message: unknown) => {
-      const msg = message as TicketMessage;
+      console.log('[TicketDetail] Received message:new event:', message);
+      const msg = message as TicketMessage & { offerHumanHelp?: boolean; isAI?: boolean };
       if (!msg.isInternal) {
-        setMessages((prev) => [...prev, msg]);
+        // Éviter les doublons - vérifier si le message existe déjà
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === msg.id);
+          if (exists) {
+            console.log('[TicketDetail] Message already exists, skipping:', msg.id);
+            return prev;
+          }
+          return [...prev, msg];
+        });
+        // Afficher le bouton "Parler à un humain" si l'IA le propose
+        if (msg.isAI && msg.offerHumanHelp) {
+          setShowHumanHelpButton(true);
+        }
       }
     };
 
     const handleTicketUpdate = (updatedTicket: unknown) => {
+      console.log('[TicketDetail] Received ticket:updated event:', updatedTicket);
       setTicket(updatedTicket as Ticket);
+    };
+
+    const handleAITyping = (data: unknown) => {
+      console.log('[TicketDetail] Received ai:typing event:', data);
+      const typingData = data as { ticketId: string; isTyping: boolean };
+      if (typingData.ticketId === id) {
+        setIsAITyping(typingData.isTyping);
+      }
     };
 
     socketService.on('message:new', handleNewMessage);
     socketService.on('ticket:updated', handleTicketUpdate);
+    socketService.on('ai:typing', handleAITyping);
 
     return () => {
       socketService.leaveTicketRoom(id);
       socketService.off('message:new', handleNewMessage);
       socketService.off('ticket:updated', handleTicketUpdate);
+      socketService.off('ai:typing', handleAITyping);
     };
   }, [id]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive or AI is typing
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isAITyping]);
 
   // Clear success message
   useEffect(() => {
@@ -138,11 +165,40 @@ export function TicketDetailPage() {
         attachments: attachmentIds,
       });
 
-      setMessages((prev) => [...prev, message]);
+      // Ajouter le message avec vérification des doublons
+      setMessages((prev) => {
+        const exists = prev.some((m) => m.id === message.id);
+        if (exists) return prev;
+        return [...prev, message];
+      });
       setNewMessage('');
       setFiles([]);
+      setShowHumanHelpButton(false); // Cacher le bouton après envoi d'un message
     } catch (error) {
       console.error('Error sending message:', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleRequestHumanHelp = async () => {
+    if (!id) return;
+    setIsSending(true);
+    try {
+      // Envoyer un message demandant un agent humain
+      const message = await messagesApi.send(id, {
+        content: "Je souhaite parler à un conseiller humain.",
+        attachments: [],
+      });
+      // Ajouter le message avec vérification des doublons
+      setMessages((prev) => {
+        const exists = prev.some((m) => m.id === message.id);
+        if (exists) return prev;
+        return [...prev, message];
+      });
+      setShowHumanHelpButton(false);
+    } catch (error) {
+      console.error('Error requesting human help:', error);
     } finally {
       setIsSending(false);
     }
@@ -305,6 +361,9 @@ export function TicketDetailPage() {
             {/* Messages */}
             {messages.map((message) => {
               const isOwnMessage = message.authorId === user?.id;
+              const isAIMessage = message.author?.displayName?.includes('IA') ||
+                                  message.authorName?.includes('IA') ||
+                                  (message as unknown as { isAI?: boolean }).isAI;
               return (
                 <div
                   key={message.id}
@@ -315,13 +374,24 @@ export function TicketDetailPage() {
                       'max-w-[80%] p-4 rounded-lg',
                       isOwnMessage
                         ? 'bg-primary-600 text-white'
+                        : isAIMessage
+                        ? 'bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 text-gray-900'
                         : 'bg-gray-100 text-gray-900'
                     )}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className={cn('text-sm font-medium', isOwnMessage ? 'text-primary-100' : 'text-gray-600')}>
-                        {isOwnMessage ? 'Vous' : message.author?.displayName || 'Agent'}
-                      </span>
+                      {isAIMessage ? (
+                        <div className="flex items-center">
+                          <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-2">
+                            <span className="text-white text-[10px] font-bold">IA</span>
+                          </div>
+                          <span className="text-sm font-medium text-blue-700">Assistant IA KLY</span>
+                        </div>
+                      ) : (
+                        <span className={cn('text-sm font-medium', isOwnMessage ? 'text-primary-100' : 'text-gray-600')}>
+                          {isOwnMessage ? 'Vous' : message.author?.displayName || 'Agent'}
+                        </span>
+                      )}
                       <span className={cn('text-xs ml-4', isOwnMessage ? 'text-primary-200' : 'text-gray-500')}>
                         {formatMessageTime(message.createdAt)}
                       </span>
@@ -350,6 +420,43 @@ export function TicketDetailPage() {
                 </div>
               );
             })}
+
+            {/* AI Typing Indicator */}
+            {isAITyping && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] p-4 rounded-lg bg-gray-100">
+                  <div className="flex items-center mb-1">
+                    <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-2">
+                      <span className="text-white text-xs font-bold">IA</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-600">Assistant IA KLY</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <div className="flex space-x-1">
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                    <span className="text-sm text-gray-500 ml-2">est en train d'écrire...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Human Help Button */}
+            {showHumanHelpButton && !isAITyping && (
+              <div className="flex justify-center my-4">
+                <button
+                  onClick={handleRequestHumanHelp}
+                  disabled={isSending}
+                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  <User size={18} />
+                  Parler à un conseiller humain
+                </button>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
@@ -466,6 +573,47 @@ export function TicketDetailPage() {
               )}
             </dl>
           </div>
+
+          {/* Documents */}
+          {(() => {
+            // Collect all attachments from ticket and messages
+            const allAttachments = [
+              ...(ticket.attachments || []),
+              ...messages.flatMap(m => m.attachments || [])
+            ];
+
+            if (allAttachments.length > 0) {
+              return (
+                <div className="card p-4">
+                  <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                    <FileText size={16} className="mr-2 text-gray-500" />
+                    Documents ({allAttachments.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {allAttachments.map((attachment) => (
+                      <a
+                        key={attachment.id}
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                      >
+                        <div className="w-8 h-8 bg-white rounded flex items-center justify-center border border-gray-200">
+                          <FileText size={16} className="text-gray-400" />
+                        </div>
+                        <div className="ml-2 flex-1 min-w-0">
+                          <p className="text-sm text-gray-900 truncate">{attachment.fileName}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(attachment.sizeBytes)}</p>
+                        </div>
+                        <Download size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {/* History */}
           {showHistory && ticket.history && (

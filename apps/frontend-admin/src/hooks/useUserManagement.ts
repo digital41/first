@@ -243,6 +243,7 @@ const useUserManagement = ({
           role: data.role,
           isActive: data.status === UserStatus.ACTIVE,
           phone: data.phone,
+          password: data.password,
         });
 
         const updatedUser = mapUserToManagedUser(apiUser);

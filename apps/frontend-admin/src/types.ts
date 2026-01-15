@@ -124,12 +124,13 @@ export interface TicketHistory {
 
 export interface Ticket {
   id: string;
+  ticketNumber?: number;
   title: string;
   description?: string;
   status: TicketStatus;
   priority: TicketPriority;
   issueType: IssueType;
-  slaDeadline?: Date;
+  slaDeadline?: Date | string;
   slaBreached: boolean;
   tags: string[];
   customerId?: string;
@@ -139,14 +140,23 @@ export interface Ticket {
   orderId?: string;
   order?: Order;
   attachments?: Attachment[];
+  messages?: TicketMessage[];
   satisfactionScore?: number;
   history?: TicketHistory[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   companyName?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  // Informations équipement
+  serialNumber?: string;
+  equipmentModel?: string;
+  equipmentBrand?: string;
+  errorCode?: string;
+  _count?: {
+    messages?: number;
+  };
 }
 
 export interface UpdateTicketPayload {
@@ -178,13 +188,16 @@ export interface TicketMessage {
 
 export interface Notification {
   id: string;
-  userId: string;
+  userId?: string;
   type: NotificationType;
   ticketId?: string;
   messageId?: string;
   payload?: Record<string, unknown>;
+  // For real-time notifications
+  title?: string;
+  body?: string;
   isRead: boolean;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 // ============================================

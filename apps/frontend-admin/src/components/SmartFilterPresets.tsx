@@ -9,9 +9,8 @@ import {
   Plus,
   X,
   Star,
-  StarOff,
 } from 'lucide-react';
-import { TicketFilters } from '../types';
+import { TicketFilters, TicketStatus, TicketPriority } from '../types';
 
 // ============================================
 // SMART FILTER PRESETS COMPONENT
@@ -42,13 +41,13 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     id: 'urgent',
     name: 'Urgents',
     icon: 'alert',
-    filters: { priority: 'URGENT' },
+    filters: { priority: TicketPriority.URGENT },
   },
   {
     id: 'sla-risk',
     name: 'SLA à risque',
     icon: 'clock',
-    filters: { status: 'OPEN' }, // Would need backend support for SLA filtering
+    filters: { status: TicketStatus.OPEN }, // Would need backend support for SLA filtering
   },
   {
     id: 'unassigned',
@@ -66,13 +65,13 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     id: 'open',
     name: 'Ouverts',
     icon: 'inbox',
-    filters: { status: 'OPEN' },
+    filters: { status: TicketStatus.OPEN },
   },
   {
     id: 'in-progress',
     name: 'En cours',
     icon: 'zap',
-    filters: { status: 'IN_PROGRESS' },
+    filters: { status: TicketStatus.IN_PROGRESS },
   },
 ];
 
@@ -150,16 +149,6 @@ const SmartFilterPresets: React.FC<SmartFilterPresetsProps> = ({
     if (activePresetId === presetId) {
       setActivePresetId(null);
     }
-  };
-
-  const handleToggleFavorite = (presetId: string) => {
-    const updatedPresets = presets.map((p) =>
-      p.id === presetId ? { ...p, isFavorite: !p.isFavorite } : p
-    );
-    setPresets(updatedPresets);
-
-    const customPresets = updatedPresets.filter((p) => p.isCustom);
-    saveCustomPresets(customPresets);
   };
 
   const getIcon = (iconName: string) => {

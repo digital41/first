@@ -8,7 +8,7 @@ import { Clock, AlertTriangle, AlertCircle } from 'lucide-react';
 // S'intègre dans la liste des tickets
 
 interface SLACountdownProps {
-  deadline: Date | string | null;
+  deadline?: Date | string | null;
   breached?: boolean;
 }
 

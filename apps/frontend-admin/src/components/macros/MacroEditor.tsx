@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
-  Plus,
   Trash2,
   GripVertical,
   Save,
@@ -73,19 +72,19 @@ const ACTION_LABELS: Record<MacroActionType, string> = {
 };
 
 const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
-  { value: 'OPEN', label: 'Ouvert' },
-  { value: 'IN_PROGRESS', label: 'En cours' },
-  { value: 'WAITING_CUSTOMER', label: 'En attente client' },
-  { value: 'ESCALATED', label: 'Escaladé' },
-  { value: 'RESOLVED', label: 'Résolu' },
-  { value: 'CLOSED', label: 'Fermé' },
+  { value: TicketStatus.OPEN, label: 'Ouvert' },
+  { value: TicketStatus.IN_PROGRESS, label: 'En cours' },
+  { value: TicketStatus.WAITING_CUSTOMER, label: 'En attente client' },
+  { value: TicketStatus.ESCALATED, label: 'Escaladé' },
+  { value: TicketStatus.RESOLVED, label: 'Résolu' },
+  { value: TicketStatus.CLOSED, label: 'Fermé' },
 ];
 
 const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
-  { value: 'LOW', label: 'Basse' },
-  { value: 'MEDIUM', label: 'Moyenne' },
-  { value: 'HIGH', label: 'Haute' },
-  { value: 'URGENT', label: 'Urgente' },
+  { value: TicketPriority.LOW, label: 'Basse' },
+  { value: TicketPriority.MEDIUM, label: 'Moyenne' },
+  { value: TicketPriority.HIGH, label: 'Haute' },
+  { value: TicketPriority.URGENT, label: 'Urgente' },
 ];
 
 const MacroEditor: React.FC<MacroEditorProps> = ({ macro, onSave, onCancel }) => {
@@ -116,21 +115,6 @@ const MacroEditor: React.FC<MacroEditorProps> = ({ macro, onSave, onCancel }) =>
   // Remove action
   const removeAction = (index: number) => {
     setActions(actions.filter((_, i) => i !== index));
-  };
-
-  // Move action
-  const moveAction = (index: number, direction: 'up' | 'down') => {
-    if (
-      (direction === 'up' && index === 0) ||
-      (direction === 'down' && index === actions.length - 1)
-    ) {
-      return;
-    }
-
-    const updated = [...actions];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
-    setActions(updated);
   };
 
   // Handle save

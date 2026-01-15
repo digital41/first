@@ -52,6 +52,7 @@ export function authenticate(
       id: payload.userId,
       email: payload.email,
       role: payload.role,
+      customerCode: payload.customerCode,
     };
 
     next();
@@ -230,6 +231,7 @@ export function optionalAuth(
         id: payload.userId,
         email: payload.email,
         role: payload.role,
+        customerCode: payload.customerCode,
       };
     }
   } catch {

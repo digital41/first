@@ -12,12 +12,30 @@ import {
   AlertCircle,
   PlusCircle,
   FileText,
-  ChevronRight
+  ChevronRight,
+  Receipt,
+  ShoppingCart
 } from 'lucide-react';
 import { ordersApi } from '@/services/api';
 import { Order } from '@/types';
 import { PageLoading, EmptyState } from '@/components/common';
 import { formatDate, formatDateTime, cn } from '@/utils/helpers';
+
+// Labels de statut SAGE
+const SAGE_STATUS_LABELS: Record<string, string> = {
+  'EN_COURS': 'En cours',
+  'LIVREE': 'Livrée',
+  'FACTUREE': 'Facturée',
+  'INCONNU': 'Inconnu',
+};
+
+// Types de documents SAGE
+const DOC_TYPE_LABELS: Record<number, string> = {
+  1: 'Bon de Commande',
+  2: 'Bon de Préparation',
+  3: 'Bon de Livraison',
+  6: 'Facture',
+};
 
 // Orders List Page
 export function OrdersListPage() {
@@ -41,41 +59,51 @@ export function OrdersListPage() {
   }, []);
 
   const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'delivered':
-      case 'livrée':
-        return <CheckCircle className="text-green-500" size={18} />;
-      case 'shipped':
-      case 'expédiée':
+    const normalizedStatus = status.toUpperCase();
+    switch (normalizedStatus) {
+      case 'FACTUREE':
+      case 'DELIVERED':
+      case 'LIVRÉE':
+        return <Receipt className="text-green-500" size={18} />;
+      case 'LIVREE':
+      case 'SHIPPED':
+      case 'EXPÉDIÉE':
         return <Truck className="text-blue-500" size={18} />;
-      case 'processing':
-      case 'en traitement':
+      case 'EN_COURS':
+      case 'PROCESSING':
+      case 'EN TRAITEMENT':
         return <Clock className="text-yellow-500" size={18} />;
-      case 'cancelled':
-      case 'annulée':
+      case 'CANCELLED':
+      case 'ANNULÉE':
         return <AlertCircle className="text-red-500" size={18} />;
       default:
-        return <Package className="text-gray-500" size={18} />;
+        return <ShoppingCart className="text-gray-500" size={18} />;
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'delivered':
-      case 'livrée':
+    const normalizedStatus = status.toUpperCase();
+    switch (normalizedStatus) {
+      case 'FACTUREE':
         return 'bg-green-100 text-green-800';
-      case 'shipped':
-      case 'expédiée':
+      case 'LIVREE':
+      case 'DELIVERED':
+      case 'LIVRÉE':
         return 'bg-blue-100 text-blue-800';
-      case 'processing':
-      case 'en traitement':
+      case 'EN_COURS':
+      case 'PROCESSING':
+      case 'EN TRAITEMENT':
         return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-      case 'annulée':
+      case 'CANCELLED':
+      case 'ANNULÉE':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getStatusLabel = (status: string) => {
+    return SAGE_STATUS_LABELS[status.toUpperCase()] || status;
   };
 
   if (isLoading) {
@@ -103,8 +131,8 @@ export function OrdersListPage() {
         <div className="space-y-4">
           {orders.map((order) => (
             <Link
-              key={order.id}
-              to={`/orders/${order.id}`}
+              key={order.orderNumber}
+              to={`/orders/${order.orderNumber}`}
               className="card p-4 hover:shadow-md transition-shadow block"
             >
               <div className="flex items-start justify-between">
@@ -114,9 +142,23 @@ export function OrdersListPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{order.orderNumber}</h3>
+                    {order.docType && (
+                      <p className="text-xs text-primary-600 font-medium">
+                        {DOC_TYPE_LABELS[order.docType] || 'Document'}
+                      </p>
+                    )}
                     <p className="text-sm text-gray-500 mt-1">
-                      Commandé le {formatDate(order.orderDate)}
+                      {order.orderDate ? `Commandé le ${formatDate(order.orderDate)}` : 'Date non disponible'}
                     </p>
+                    {order.companyName && (
+                      <p className="text-sm text-gray-600">{order.companyName}</p>
+                    )}
+                    {/* Afficher le nombre de lignes de commande */}
+                    {order.lines && order.lines.length > 0 && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {order.lines.length} article{order.lines.length > 1 ? 's' : ''}
+                      </p>
+                    )}
                     {order.items && order.items.length > 0 && (
                       <p className="text-sm text-gray-600 mt-1">
                         {order.items.length} article{order.items.length > 1 ? 's' : ''}
@@ -133,11 +175,11 @@ export function OrdersListPage() {
                         getStatusColor(order.status)
                       )}
                     >
-                      {order.status}
+                      {getStatusLabel(order.status)}
                     </span>
-                    {order.totalAmount && (
+                    {order.totalAmount !== undefined && order.totalAmount !== null && (
                       <p className="text-lg font-semibold text-gray-900 mt-1">
-                        {order.totalAmount.toLocaleString('fr-FR')} €
+                        {Number(order.totalAmount).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € HT
                       </p>
                     )}
                   </div>
@@ -184,26 +226,35 @@ export function OrderDetailPage() {
     return null;
   }
 
+  // Statut SAGE: EN_COURS -> 0, LIVREE -> 1, FACTUREE -> 2
   const getStatusStep = (status: string): number => {
-    switch (status.toLowerCase()) {
-      case 'pending':
-      case 'en attente':
+    const normalizedStatus = status.toUpperCase();
+    switch (normalizedStatus) {
+      case 'EN_COURS':
+      case 'PENDING':
+      case 'EN ATTENTE':
+      case 'PROCESSING':
+      case 'EN TRAITEMENT':
         return 0;
-      case 'processing':
-      case 'en traitement':
+      case 'LIVREE':
+      case 'SHIPPED':
+      case 'EXPÉDIÉE':
         return 1;
-      case 'shipped':
-      case 'expédiée':
+      case 'FACTUREE':
+      case 'DELIVERED':
+      case 'LIVRÉE':
         return 2;
-      case 'delivered':
-      case 'livrée':
-        return 3;
       default:
         return 0;
     }
   };
 
   const currentStep = getStatusStep(order.status);
+
+  // Lignes de commande (SAGE ou local)
+  const orderLines = order.lines || [];
+  const orderItems = order.items || [];
+  const hasLines = orderLines.length > 0 || orderItems.length > 0;
 
   return (
     <div className="space-y-6 fade-in">
@@ -220,12 +271,20 @@ export function OrderDetailPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="page-title">{order.orderNumber}</h1>
+            {order.docType && (
+              <p className="text-sm text-primary-600 font-medium mb-1">
+                {DOC_TYPE_LABELS[order.docType] || 'Document'}
+              </p>
+            )}
             <p className="page-subtitle">
-              Commandé le {formatDateTime(order.orderDate)}
+              {order.orderDate ? `Commandé le ${formatDateTime(order.orderDate)}` : 'Date non disponible'}
             </p>
+            {order.companyName && (
+              <p className="text-gray-600 mt-1">{order.companyName}</p>
+            )}
           </div>
           <Link
-            to={`/tickets/new?orderId=${order.id}`}
+            to={`/tickets/new?orderNumber=${order.orderNumber}`}
             className="btn-primary"
           >
             <PlusCircle size={18} className="mr-2" />
@@ -234,25 +293,24 @@ export function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Status tracker */}
+      {/* Status tracker - Adapté pour SAGE */}
       <div className="card p-6">
-        <h2 className="font-semibold text-gray-900 mb-6">Suivi de livraison</h2>
+        <h2 className="font-semibold text-gray-900 mb-6">Statut de la commande</h2>
         <div className="relative">
           {/* Progress line */}
           <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-200">
             <div
               className="h-full bg-primary-600 transition-all"
-              style={{ width: `${(currentStep / 3) * 100}%` }}
+              style={{ width: `${(currentStep / 2) * 100}%` }}
             />
           </div>
 
-          {/* Steps */}
+          {/* Steps - Adapté pour SAGE */}
           <div className="relative flex justify-between">
             {[
-              { label: 'Commande reçue', icon: FileText },
-              { label: 'En préparation', icon: Package },
-              { label: 'Expédiée', icon: Truck },
-              { label: 'Livrée', icon: CheckCircle },
+              { label: 'En cours', icon: Clock, status: 'EN_COURS' },
+              { label: 'Livrée', icon: Truck, status: 'LIVREE' },
+              { label: 'Facturée', icon: Receipt, status: 'FACTUREE' },
             ].map((step, index) => {
               const Icon = step.icon;
               const isCompleted = index <= currentStep;
@@ -293,14 +351,36 @@ export function OrderDetailPage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Order details */}
+        {/* Order details - Support SAGE lines */}
         <div className="card p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Détails de la commande</h2>
 
-          {order.items && order.items.length > 0 ? (
+          {hasLines ? (
             <div className="space-y-4">
-              {order.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+              {/* Lignes SAGE */}
+              {orderLines.map((line, index) => (
+                <div key={`line-${line.lineNumber || index}`} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{line.productName}</p>
+                    {line.productCode && (
+                      <p className="text-sm text-gray-500">Réf: {line.productCode}</p>
+                    )}
+                    <p className="text-sm text-gray-500">
+                      Qté: {Number(line.quantity).toLocaleString('fr-FR')}
+                      {line.unitPrice > 0 && (
+                        <span className="ml-2">× {Number(line.unitPrice).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                      )}
+                    </p>
+                  </div>
+                  <p className="font-medium text-gray-900 ml-4">
+                    {Number(line.totalHT).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                  </p>
+                </div>
+              ))}
+
+              {/* Lignes locales (items) */}
+              {orderItems.map((item, index) => (
+                <div key={`item-${item.id || index}`} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                   <div>
                     <p className="font-medium text-gray-900">{item.productName}</p>
                     {item.productSku && (
@@ -309,20 +389,23 @@ export function OrderDetailPage() {
                     <p className="text-sm text-gray-500">Qté: {item.quantity}</p>
                   </div>
                   <p className="font-medium text-gray-900">
-                    {item.totalPrice.toLocaleString('fr-FR')} €
+                    {item.totalPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
                   </p>
                 </div>
               ))}
 
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
-                  <span>{order.totalAmount?.toLocaleString('fr-FR')} €</span>
+              {/* Total */}
+              {order.totalAmount !== undefined && order.totalAmount !== null && (
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex justify-between text-lg font-semibold">
+                    <span>Total HT</span>
+                    <span>{Number(order.totalAmount).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
-            <p className="text-gray-500">Aucun détail disponible</p>
+            <p className="text-gray-500">Aucun détail disponible pour cette commande.</p>
           )}
         </div>
 
@@ -341,18 +424,32 @@ export function OrderDetailPage() {
 
           {/* Contact info */}
           <div className="card p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">Informations de contact</h2>
+            <h2 className="font-semibold text-gray-900 mb-4">Informations client</h2>
             <dl className="space-y-3">
+              {order.customerCode && (
+                <div>
+                  <dt className="text-xs text-gray-500 uppercase">Code client</dt>
+                  <dd className="text-gray-900 font-mono">{order.customerCode}</dd>
+                </div>
+              )}
+              {order.companyName && (
+                <div>
+                  <dt className="text-xs text-gray-500 uppercase">Société</dt>
+                  <dd className="text-gray-900">{order.companyName}</dd>
+                </div>
+              )}
               {order.customerName && (
                 <div>
                   <dt className="text-xs text-gray-500 uppercase">Nom</dt>
                   <dd className="text-gray-900">{order.customerName}</dd>
                 </div>
               )}
-              <div>
-                <dt className="text-xs text-gray-500 uppercase">Email</dt>
-                <dd className="text-gray-900">{order.customerEmail}</dd>
-              </div>
+              {order.customerEmail && (
+                <div>
+                  <dt className="text-xs text-gray-500 uppercase">Email</dt>
+                  <dd className="text-gray-900">{order.customerEmail}</dd>
+                </div>
+              )}
               {order.customerPhone && (
                 <div>
                   <dt className="text-xs text-gray-500 uppercase">Téléphone</dt>

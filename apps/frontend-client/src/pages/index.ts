@@ -8,3 +8,4 @@ export { OrdersListPage, OrderDetailPage } from './OrdersPage';
 export { FAQPage } from './FAQPage';
 export { KnowledgeBasePage } from './KnowledgeBasePage';
 export { ContactPage } from './ContactPage';
+export { ProfilePage } from './ProfilePage';

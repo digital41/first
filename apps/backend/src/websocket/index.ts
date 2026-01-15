@@ -8,6 +8,10 @@ export {
   sendNotificationToUser,
   broadcastTicketUpdate,
   broadcastTicketAssigned,
+  broadcastAITyping,
+  broadcastNewMessage,
+  notifyHumanTakeover,
+  broadcastHumanTakeoverToAdmins,
   io,
 } from './socket.js';
 

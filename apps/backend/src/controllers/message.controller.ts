@@ -1,8 +1,9 @@
 import type { Response } from 'express';
 import { prisma } from '../config/database.js';
 import type { AuthenticatedRequest } from '../types/index.js';
-import { broadcastTicketUpdate } from '../websocket/index.js';
+import { broadcastTicketUpdate, broadcastAITyping, broadcastNewMessage, notifyHumanTakeover, broadcastHumanTakeoverToAdmins } from '../websocket/index.js';
 import { notifyNewMessage } from '../services/notification.service.js';
+import { AIService } from '../services/ai.service.js';
 
 // ============================================
 // CONTROLLER MESSAGES
@@ -170,7 +171,7 @@ export async function createMessage(
 
     // Broadcast via WebSocket (ne pas broadcaster les notes internes au client)
     if (!finalIsInternal) {
-      broadcastTicketUpdate(ticketId, 'newMessage', {
+      broadcastNewMessage(ticketId, {
         id: message.id,
         authorId: message.author.id,
         authorName: message.author.displayName,
@@ -209,6 +210,16 @@ export async function createMessage(
           ticket.title
         );
       }
+    }
+
+    // ============================================
+    // RÉPONSE AUTOMATIQUE IA (pour les clients)
+    // ============================================
+    if (role === 'CUSTOMER') {
+      // Déclencher l'IA en arrière-plan (ne pas bloquer la réponse)
+      triggerAIResponse(ticketId).catch(err => {
+        console.error('[AI Auto-Response Error]', err);
+      });
     }
 
     res.status(201).json({
@@ -255,5 +266,140 @@ export async function markAsRead(
   } catch (error) {
     console.error('[Mark Read Error]', error);
     res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+}
+
+// ============================================
+// FONCTION HELPER: Réponse automatique IA
+// ============================================
+
+/**
+ * Déclenche une réponse automatique de l'IA pour un ticket
+ * Exécutée en arrière-plan après qu'un client envoie un message
+ */
+async function triggerAIResponse(ticketId: string): Promise<void> {
+  try {
+    // Petit délai pour que le message du client soit bien enregistré
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Récupérer le contexte du ticket
+    // L'IA répond TOUJOURS en premier niveau, même si un agent humain est assigné
+    // Elle complète l'agent humain, elle ne le remplace pas
+    const context = await AIService.getTicketContext(ticketId);
+    if (!context) {
+      console.log(`[AI] Ticket ${ticketId} non trouvé`);
+      return;
+    }
+
+    // Notifier que l'IA est en train d'écrire
+    broadcastAITyping(ticketId, true);
+
+    // Générer la réponse IA
+    console.log(`[AI] Génération réponse pour ticket #${context.ticketNumber}...`);
+    const response = await AIService.generateResponse(context);
+
+    // Arrêter l'indicateur de frappe
+    broadcastAITyping(ticketId, false);
+
+    if (!response.success) {
+      console.error(`[AI] Échec génération pour ticket ${ticketId}`);
+      return;
+    }
+
+    // Sauvegarder la réponse IA
+    await AIService.saveAIMessage(ticketId, response.message, {
+      confidence: response.confidence,
+      shouldEscalate: response.shouldEscalate,
+      generatedAt: new Date().toISOString(),
+      auto: true,
+    });
+
+    // Récupérer le message IA créé pour le broadcast
+    const aiMessage = await prisma.chatMessage.findFirst({
+      where: { ticketId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: {
+          select: { id: true, displayName: true, role: true },
+        },
+      },
+    });
+
+    if (aiMessage) {
+      // Broadcast via WebSocket
+      broadcastNewMessage(ticketId, {
+        id: aiMessage.id,
+        authorId: aiMessage.author?.id,
+        authorName: aiMessage.author?.displayName || 'Assistant IA KLY',
+        content: aiMessage.content,
+        isInternal: false,
+        createdAt: aiMessage.createdAt.toISOString(),
+        attachments: [],
+        isAI: true,
+        offerHumanHelp: response.offerHumanHelp,
+      });
+    }
+
+    console.log(`[AI] Réponse envoyée pour ticket #${context.ticketNumber} (confiance: ${response.confidence}%, offerHuman: ${response.offerHumanHelp})`);
+
+    // ============================================
+    // EXTRACTION AUTOMATIQUE D'INFORMATIONS
+    // ============================================
+    // Pour les tickets techniques, extraire les infos d'équipement de la conversation
+    if (context.issueType === 'TECHNICAL') {
+      const extractedInfo = AIService.extractEquipmentInfo(context.conversationHistory);
+
+      if (Object.keys(extractedInfo).length > 0) {
+        console.log(`[AI] Informations extraites:`, extractedInfo);
+
+        const updated = await AIService.updateTicketWithExtractedInfo(ticketId, extractedInfo);
+
+        if (updated) {
+          // Notifier le frontend que le ticket a été mis à jour
+          broadcastTicketUpdate(ticketId, 'equipmentInfo', extractedInfo);
+        }
+      }
+    }
+
+    // Si l'IA recommande une escalade, notifier l'agent assigné ou tous les admins
+    if (response.shouldEscalate) {
+      console.log(`[AI] Escalade recommandée pour ticket #${context.ticketNumber}`);
+
+      // Récupérer le ticket pour avoir l'agent assigné
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        select: {
+          id: true,
+          ticketNumber: true,
+          assignedToId: true,
+          contactName: true,
+          companyName: true,
+          customer: { select: { displayName: true } },
+        },
+      });
+
+      if (ticket) {
+        const customerName = ticket.contactName || ticket.companyName || ticket.customer?.displayName || 'Client';
+        const takeoverData = {
+          ticketId: ticket.id,
+          ticketNumber: ticket.ticketNumber.toString(),
+          customerName,
+          message: 'L\'assistant IA recommande une prise en charge humaine',
+        };
+
+        // Si un agent est assigné, le notifier directement
+        if (ticket.assignedToId) {
+          notifyHumanTakeover(ticket.assignedToId, takeoverData);
+        } else {
+          // Sinon, notifier tous les admins/superviseurs
+          broadcastHumanTakeoverToAdmins(takeoverData);
+        }
+      }
+    }
+
+  } catch (error) {
+    // S'assurer que l'indicateur de frappe est arrêté en cas d'erreur
+    broadcastAITyping(ticketId, false);
+    console.error('[AI Auto-Response Error]', error);
   }
 }

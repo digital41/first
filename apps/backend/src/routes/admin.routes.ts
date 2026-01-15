@@ -7,6 +7,7 @@ import * as notificationController from '../controllers/notification.controller.
 import * as slaController from '../controllers/sla.controller.js';
 import * as cannedResponseController from '../controllers/canned-response.controller.js';
 import * as uploadController from '../controllers/upload.controller.js';
+import * as aiController from '../controllers/ai.controller.js';
 import { upload } from '../config/multer.js';
 
 // ============================================
@@ -131,5 +132,21 @@ router.delete('/canned-responses/:id', cannedResponseController.deleteCannedResp
 
 // Upload de fichiers
 router.post('/upload', upload.array('files', 5), uploadController.uploadFiles as unknown as RequestHandler);
+
+// ============================================
+// ASSISTANT IA OPÉRATEUR
+// ============================================
+
+// Obtenir une suggestion IA pour un ticket
+router.post('/ai/suggest/:ticketId', aiController.getAISuggestion as unknown as RequestHandler);
+
+// Analyser rapidement un ticket
+router.post('/ai/analyze/:ticketId', aiController.analyzeTicket as unknown as RequestHandler);
+
+// Résumé intelligent de la conversation par IA
+router.post('/ai/summary/:ticketId', aiController.getConversationSummary as unknown as RequestHandler);
+
+// Chat avec l'assistant IA global
+router.post('/ai/chat', aiController.chatWithGlobalAssistant as unknown as RequestHandler);
 
 export default router;

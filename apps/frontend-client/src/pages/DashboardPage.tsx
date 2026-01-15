@@ -236,8 +236,8 @@ export function DashboardPage() {
             ) : (
               recentOrders.map((order) => (
                 <Link
-                  key={order.id}
-                  to={`/orders/${order.id}`}
+                  key={order.orderNumber}
+                  to={`/orders/${order.orderNumber}`}
                   className="block p-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center justify-between">
@@ -246,7 +246,7 @@ export function DashboardPage() {
                         {order.orderNumber}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {formatRelativeTime(order.orderDate)}
+                        {order.orderDate ? formatRelativeTime(order.orderDate) : 'Date non disponible'}
                       </p>
                     </div>
                     <div className="text-right">

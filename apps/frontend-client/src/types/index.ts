@@ -64,30 +64,44 @@ export interface User {
   updatedAt: string;
 }
 
-// Order
+// Order (compatible SAGE 100 et base locale)
 export interface Order {
-  id: string;
-  orderNumber: string;
-  customerEmail: string;
+  id?: string;
+  orderNumber: string;      // DO_Piece
+  customerCode?: string;    // DO_Tiers (code client SAGE)
+  customerEmail?: string;
   customerPhone?: string;
   customerName?: string;
-  totalAmount?: number;
-  status: string;
-  orderDate: string;
+  companyName?: string;     // CT_Intitule
+  totalAmount?: number;     // DO_TotalHT
+  status: string;           // Statut (EN_COURS, LIVREE, FACTUREE)
+  docType?: number;         // Type de document SAGE (1=BC, 2=BP, 3=BL, 6=FA)
+  orderDate?: string;       // DO_Date
   deliveryDate?: string;
   shippingAddress?: string;
-  items?: OrderItem[];
-  createdAt: string;
-  updatedAt: string;
+  items?: OrderItem[];      // Lignes de commande (SageOrderLine[])
+  lines?: OrderLine[];      // Lignes depuis SAGE
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface OrderItem {
-  id: string;
+  id?: string;
   productName: string;
   productSku?: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+}
+
+// Ligne de commande SAGE
+export interface OrderLine {
+  lineNumber: number;       // DL_Ligne
+  productCode: string;      // AR_Ref
+  productName: string;      // DL_Design
+  quantity: number;         // DL_Qte
+  unitPrice: number;        // DL_PrixUnitaire
+  totalHT: number;          // DL_MontantHT
 }
 
 // Ticket
@@ -108,6 +122,12 @@ export interface Ticket {
   contactEmail?: string;
   contactPhone?: string;
   contactName?: string;
+  // Informations équipement
+  serialNumber?: string;
+  equipmentModel?: string;
+  equipmentBrand?: string;
+  errorCode?: string;
+  // SLA et dates
   slaDeadline?: string;
   slaBreached: boolean;
   resolvedAt?: string;
@@ -259,6 +279,11 @@ export interface CreateTicketInput {
   contactPhone?: string;
   contactName?: string;
   attachments?: string[];
+  // Informations équipement
+  serialNumber?: string;
+  equipmentModel?: string;
+  equipmentBrand?: string;
+  errorCode?: string;
 }
 
 export interface SendMessageInput {

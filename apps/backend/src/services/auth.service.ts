@@ -5,6 +5,7 @@ import { config } from '../config/index.js';
 import { AppError } from '../middlewares/error.middleware.js';
 import type { JwtPayload, TokenPair, SafeUser } from '../types/index.js';
 import type { User } from '@prisma/client';
+import { SageService, type SageCustomer, type SageOrder } from './sage.service.js';
 
 // ============================================
 // SERVICE D'AUTHENTIFICATION
@@ -15,11 +16,12 @@ const SALT_ROUNDS = 12;
 /**
  * Génère une paire de tokens (access + refresh)
  */
-export function generateTokenPair(user: Pick<User, 'id' | 'email' | 'role'>): TokenPair {
+export function generateTokenPair(user: Pick<User, 'id' | 'email' | 'role' | 'customerCode'>): TokenPair {
   const accessPayload: JwtPayload = {
     userId: user.id,
     email: user.email || '',
     role: user.role,
+    customerCode: user.customerCode || undefined,
     type: 'access',
   };
 
@@ -27,6 +29,7 @@ export function generateTokenPair(user: Pick<User, 'id' | 'email' | 'role'>): To
     userId: user.id,
     email: user.email || '',
     role: user.role,
+    customerCode: user.customerCode || undefined,
     type: 'refresh',
   };
 
@@ -39,6 +42,90 @@ export function generateTokenPair(user: Pick<User, 'id' | 'email' | 'role'>): To
   } as jwt.SignOptions);
 
   return { accessToken, refreshToken };
+}
+
+/**
+ * Connexion client par code compte client SAGE 100
+ * Valide le code client directement dans SAGE
+ */
+export async function loginByCustomerCode(
+  customerCode: string
+): Promise<{ user: SafeUser; customer: SageCustomer; orders: SageOrder[]; tokens: TokenPair }> {
+  if (!customerCode?.trim()) {
+    throw AppError.badRequest('Le code client est requis');
+  }
+
+  const code = customerCode.toUpperCase().trim();
+
+  // 1. Vérifier que le client existe dans SAGE
+  const sageCustomer = await SageService.getCustomer(code);
+
+  if (!sageCustomer) {
+    // Si SAGE n'est pas disponible, essayer de trouver un utilisateur existant
+    const existingUser = await prisma.user.findUnique({
+      where: { customerCode: code },
+    });
+
+    if (!existingUser) {
+      throw AppError.notFound('Aucun compte client trouvé avec ce code dans SAGE');
+    }
+
+    // Utilisateur existant mais SAGE non disponible
+    const tokens = generateTokenPair(existingUser);
+    const { passwordHash: _, ...safeUser } = existingUser;
+
+    return {
+      user: safeUser,
+      customer: {
+        customerCode: code,
+        companyName: existingUser.displayName,
+        email: existingUser.email || undefined,
+        phone: existingUser.phone || undefined,
+      },
+      orders: [],
+      tokens,
+    };
+  }
+
+  // 2. Récupérer les commandes SAGE du client
+  const sageOrders = await SageService.getCustomerOrders(code);
+
+  // 3. Recherche ou création de l'utilisateur local
+  let user = await prisma.user.findUnique({
+    where: { customerCode: code },
+  });
+
+  if (!user) {
+    // Créer un utilisateur avec les infos SAGE
+    user = await prisma.user.create({
+      data: {
+        customerCode: code,
+        email: sageCustomer.email || null,
+        displayName: sageCustomer.companyName || `Client ${code}`,
+        role: 'CUSTOMER',
+        phone: sageCustomer.phone || null,
+      },
+    });
+  } else {
+    // Mettre à jour les infos si elles ont changé dans SAGE
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        displayName: sageCustomer.companyName || user.displayName,
+        email: sageCustomer.email || user.email,
+        phone: sageCustomer.phone || user.phone,
+        lastSeenAt: new Date(),
+      },
+    });
+  }
+
+  // 4. Génération des tokens
+  const tokens = generateTokenPair(user);
+
+  // Retourne sans le hash du mot de passe
+  const { passwordHash: _, ...safeUser } = user;
+
+  return { user: safeUser, customer: sageCustomer, orders: sageOrders, tokens };
 }
 
 /**
@@ -246,4 +333,62 @@ export async function verifyPassword(
  */
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+/**
+ * Met à jour le profil de l'utilisateur connecté
+ */
+export async function updateProfile(
+  userId: string,
+  data: {
+    displayName?: string;
+    phone?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }
+): Promise<SafeUser> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    throw AppError.notFound('Utilisateur non trouvé');
+  }
+
+  // Si changement de mot de passe
+  if (data.newPassword) {
+    if (!data.currentPassword) {
+      throw AppError.badRequest('Le mot de passe actuel est requis');
+    }
+
+    if (!user.passwordHash) {
+      throw AppError.badRequest('Ce compte ne peut pas changer de mot de passe');
+    }
+
+    const isValidPassword = await bcrypt.compare(data.currentPassword, user.passwordHash);
+    if (!isValidPassword) {
+      throw AppError.unauthorized('Mot de passe actuel incorrect');
+    }
+  }
+
+  // Préparation des données à mettre à jour
+  const updateData: { displayName?: string; phone?: string; passwordHash?: string } = {};
+
+  if (data.displayName !== undefined) {
+    updateData.displayName = data.displayName;
+  }
+
+  if (data.phone !== undefined) {
+    updateData.phone = data.phone;
+  }
+
+  if (data.newPassword) {
+    updateData.passwordHash = await bcrypt.hash(data.newPassword, SALT_ROUNDS);
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: updateData,
+  });
+
+  const { passwordHash: _, ...safeUser } = updatedUser;
+  return safeUser;
 }

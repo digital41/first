@@ -77,6 +77,13 @@ export async function list(
     // Si c'est un client, ne montre que ses tickets
     const customerId = req.user.role === 'CUSTOMER' ? req.user.id : undefined;
 
+    // Si c'est un agent (pas ADMIN ou SUPERVISOR), ne montre que ses tickets assignés
+    // Sauf s'il a explicitement demandé un autre agent via le filtre
+    let effectiveAssignedToId = assignedToId as string | undefined;
+    if (req.user.role === 'AGENT' && !assignedToId) {
+      effectiveAssignedToId = req.user.id;
+    }
+
     const result = await ticketService.listTickets({
       page: parseInt(page as string, 10),
       limit: parseInt(limit as string, 10),
@@ -85,7 +92,7 @@ export async function list(
       status: status as TicketStatus,
       issueType: issueType as IssueType,
       priority: priority as TicketPriority,
-      assignedToId: assignedToId as string,
+      assignedToId: effectiveAssignedToId,
       search: search as string,
       customerId,
     });

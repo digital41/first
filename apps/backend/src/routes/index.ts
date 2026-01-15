@@ -3,6 +3,9 @@ import authRoutes from './auth.routes.js';
 import healthRoutes from './health.routes.js';
 import clientRoutes from './client.routes.js';
 import adminRoutes from './admin.routes.js';
+import aiRoutes from './ai.routes.js';
+import sageRoutes from './sage.routes.js';
+import sageWriteRoutes from './sage-write.routes.js';
 
 // ============================================
 // ROUTEUR PRINCIPAL
@@ -37,6 +40,15 @@ router.use('/client', clientRoutes);
 // Espace Administration (staff uniquement)
 router.use('/admin', adminRoutes);
 
+// API IA (assistant intelligent)
+router.use('/ai', aiRoutes);
+
+// API SAGE (lecture seule, optionnelle)
+router.use('/sage', sageRoutes);
+
+// API SAGE V2 - Écriture (DÉSACTIVÉ par défaut, admin only)
+router.use('/sage/write', sageWriteRoutes);
+
 // ============================================
 // ROUTE RACINE
 // ============================================
@@ -50,6 +62,8 @@ router.get('/', (_req, res) => {
       auth: '/api/auth',
       client: '/api/client (espace client)',
       admin: '/api/admin (staff uniquement)',
+      sage: '/api/sage (lecture SAGE, optionnel)',
+      sageWrite: '/api/sage/write (écriture SAGE V2, désactivé par défaut)',
     },
   });
 });

@@ -151,39 +151,18 @@ interface ApiResponse<T> {
 // Backend login response type
 interface LoginResponseData {
   user: User;
-  order: Order;
+  orders: Order[];
   tokens: {
     accessToken: string;
     refreshToken: string;
   };
 }
 
-// Detect SAGE reference type from prefix
-function detectSageReferenceType(reference: string): { orderNumber?: string; blNumber?: string; faNumber?: string } {
-  const upper = reference.toUpperCase().trim();
-
-  if (upper.startsWith('BC') || upper.startsWith('CMD')) {
-    return { orderNumber: reference };
-  }
-  if (upper.startsWith('BL')) {
-    return { blNumber: reference };
-  }
-  if (upper.startsWith('FA') || upper.startsWith('FAC')) {
-    return { faNumber: reference };
-  }
-
-  // Default to orderNumber if no prefix detected
-  return { orderNumber: reference };
-}
-
 export const authApi = {
-  // Login with SAGE reference (BC, BL, or FA)
-  loginByReference: async (reference: string): Promise<AuthResponse> => {
-    const referenceParams = detectSageReferenceType(reference);
+  // Login with customer account code (SAGE 100)
+  loginByCustomerCode: async (customerCode: string): Promise<AuthResponse> => {
+    const response = await api.post<ApiResponse<LoginResponseData>>('/auth/login', { customerCode });
 
-    const response = await api.post<ApiResponse<LoginResponseData>>('/auth/login', referenceParams);
-
-    // Backend returns { success, data: { user, order, tokens, referenceType } }
     const { user, tokens } = response.data.data;
     setTokens(tokens.accessToken, tokens.refreshToken);
 
@@ -298,8 +277,20 @@ export const messagesApi = {
 };
 
 // ============================================
-// ORDERS API
+// ORDERS API (Support SAGE 100)
 // ============================================
+
+interface OrdersResponse {
+  success: boolean;
+  data: Order[];
+  source?: 'SAGE' | 'LOCAL';
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
 
 export const ordersApi = {
   // Lookup order (public)
@@ -311,13 +302,13 @@ export const ordersApi = {
     return response.data.data;
   },
 
-  // Get user orders
-  getAll: async (): Promise<Order[]> => {
-    const response = await api.get<ApiResponse<Order[]>>('/client/orders');
+  // Get user orders (from SAGE for customers)
+  getAll: async (page = 1, limit = 50): Promise<Order[]> => {
+    const response = await api.get<OrdersResponse>(`/client/orders?page=${page}&limit=${limit}`);
     return response.data.data || [];
   },
 
-  // Get order by ID
+  // Get order by ID or order number (supports SAGE)
   getById: async (id: string): Promise<Order> => {
     const response = await api.get<ApiResponse<Order>>(`/client/orders/${id}`);
     return response.data.data;

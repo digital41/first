@@ -28,6 +28,7 @@ export interface UpdateUserDto {
   role?: UserRole;
   phone?: string;
   password?: string;
+  isActive?: boolean;
 }
 
 /**
@@ -60,6 +61,7 @@ export async function listUsers(filters: UserFilters = {}) {
         phone: true,
         displayName: true,
         role: true,
+        isActive: true,
         lastSeenAt: true,
         createdAt: true,
         updatedAt: true,
@@ -116,6 +118,7 @@ export async function getUserById(id: string) {
       phone: true,
       displayName: true,
       role: true,
+      isActive: true,
       lastSeenAt: true,
       createdAt: true,
       updatedAt: true,
@@ -163,6 +166,7 @@ export async function createUser(data: CreateUserDto) {
       role: data.role,
       phone: data.phone,
       passwordHash,
+      isActive: true,
     },
     select: {
       id: true,
@@ -170,6 +174,7 @@ export async function createUser(data: CreateUserDto) {
       phone: true,
       displayName: true,
       role: true,
+      isActive: true,
       createdAt: true,
     },
   });
@@ -204,6 +209,7 @@ export async function updateUser(id: string, data: UpdateUserDto) {
   if (data.displayName !== undefined) updateData.displayName = data.displayName;
   if (data.role !== undefined) updateData.role = data.role;
   if (data.phone !== undefined) updateData.phone = data.phone;
+  if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
   if (data.password) {
     updateData.passwordHash = await hashPassword(data.password);
@@ -218,6 +224,7 @@ export async function updateUser(id: string, data: UpdateUserDto) {
       phone: true,
       displayName: true,
       role: true,
+      isActive: true,
       lastSeenAt: true,
       createdAt: true,
       updatedAt: true,
@@ -255,17 +262,27 @@ export async function deleteUser(id: string) {
 
 /**
  * Liste les agents disponibles (pour assignation)
+ * Exclut l'Assistant IA KLY qui ne peut pas être assigné directement
  */
 export async function getAvailableAgents() {
   const agents = await prisma.user.findMany({
     where: {
       role: { in: ['AGENT', 'SUPERVISOR', 'ADMIN'] },
+      isActive: true,
+      // Exclure l'assistant IA de la liste d'assignation
+      NOT: {
+        OR: [
+          { email: { contains: 'ai-assistant', mode: 'insensitive' } },
+          { displayName: { contains: 'Assistant IA', mode: 'insensitive' } },
+        ],
+      },
     },
     select: {
       id: true,
       displayName: true,
       email: true,
       role: true,
+      isActive: true,
       lastSeenAt: true,
       _count: {
         select: {

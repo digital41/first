@@ -26,7 +26,11 @@
       "Bash(find:*)",
       "Bash(tree:*)",
       "Bash(del /f \"\\\\?\\\\c:\\\\Users\\\\henriela\\\\OneDrive - KLY GROUPE\\\\Bureau\\\\DEV\\\\nul\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(ls -la \"c:\\\\Users\\\\henriela\\\\OneDrive - KLY GROUPE\\\\Bureau\\\\DEV\\\\apps\\\\frontend-admin\\\\src\\\\components\"\" | grep -E \".tsx)",
+      "Bash(.ts \")",
+      "Bash(tasklist:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWtmbHduNWwwMDAxb2s5cmQ2bXF0MDYyIiwiZW1haWwiOiJjb250YWN0LmRnZW5yQGdtYWlsLmNvbTtjb21wdGFAZGdlbnIuZnIiLCJyb2xlIjoiQ1VTVE9NRVIiLCJjdXN0b21lckNvZGUiOiI0MTExMTUzMSIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3Njg0OTEwNDQsImV4cCI6MTc2ODQ5MTk0NH0.pzfsXyIm5ZR9b2m5M70i6qHUniJmvPvDjNNGijSAzjo\")"
     ]
   }
 }

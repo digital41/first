@@ -9,6 +9,7 @@ export interface JwtPayload {
   userId: string;
   email: string;
   role: UserRole;
+  customerCode?: string;  // Code client SAGE pour les CUSTOMER
   type: 'access' | 'refresh';
 }
 
@@ -26,6 +27,7 @@ export interface AuthenticatedRequest extends Request {
     id: string;
     email: string;
     role: UserRole;
+    customerCode?: string;  // Code client SAGE pour les CUSTOMER
   };
 }
 
@@ -73,6 +75,11 @@ export interface CreateTicketDto {
   contactEmail?: string;
   contactPhone?: string;
   companyName?: string;
+  // Informations équipement (pour problèmes techniques)
+  serialNumber?: string;
+  equipmentModel?: string;
+  equipmentBrand?: string;
+  errorCode?: string;
 }
 
 export interface UpdateTicketDto {
@@ -82,6 +89,11 @@ export interface UpdateTicketDto {
   title?: string;
   description?: string;
   tags?: string[];
+  // Informations équipement
+  serialNumber?: string;
+  equipmentModel?: string;
+  equipmentBrand?: string;
+  errorCode?: string;
 }
 
 // ============================================
