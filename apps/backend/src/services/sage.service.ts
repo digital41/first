@@ -26,10 +26,15 @@ export interface SageCustomer {
   contactName?: string;        // CT_Contact
   email?: string;              // CT_EMail
   phone?: string;              // CT_Telephone
+  fax?: string;                // CT_Telecopie
   address?: string;            // CT_Adresse
+  addressComplement?: string;  // CT_Complement
   postalCode?: string;         // CT_CodePostal
   city?: string;               // CT_Ville
   country?: string;            // CT_Pays
+  siret?: string;              // CT_Siret
+  tvaIntra?: string;           // CT_Identifiant (N° TVA intracommunautaire)
+  paymentCondition?: string;   // CT_Condition (Conditions de règlement)
 }
 
 export interface SageOrder {
@@ -40,10 +45,24 @@ export interface SageOrder {
   orderDate: Date;             // DO_Date
   deliveryDate?: Date;         // DO_DateLivr
   reference?: string;          // DO_Ref
-  totalHT: number;             // Calculé depuis lignes
-  totalTTC: number;            // Calculé depuis lignes
+  totalHT: number;             // DO_TotalHT
+  totalTTC: number;            // DO_TotalTTC
   status: string;              // Dérivé
   lines?: SageOrderLine[];
+  // Champs supplémentaires pour facturation
+  expeditionMode?: string;     // DO_Expedit (mode d'expédition)
+  paymentCondition?: string;   // DO_Condition (conditions de paiement)
+  devise?: number;             // DO_Devise (devise)
+  taxRate1?: number;           // DO_Taxe1 (taux TVA 1)
+  taxRate2?: number;           // DO_Taxe2 (taux TVA 2)
+  taxRate3?: number;           // DO_Taxe3 (taux TVA 3)
+  // Adresse de livraison
+  deliveryName?: string;       // DO_Nom (nom livraison)
+  deliveryAddress?: string;    // DO_Adresse (adresse livraison)
+  deliveryComplement?: string; // DO_Complement
+  deliveryPostalCode?: string; // DO_CodePostal
+  deliveryCity?: string;       // DO_Ville
+  deliveryCountry?: string;    // DO_Pays
 }
 
 export interface SageOrderLine {
@@ -186,10 +205,14 @@ export const SageService = {
             CT_Contact as contactName,
             CT_EMail as email,
             CT_Telephone as phone,
+            CT_Telecopie as fax,
             CT_Adresse as address,
+            CT_Complement as addressComplement,
             CT_CodePostal as postalCode,
             CT_Ville as city,
-            CT_Pays as country
+            CT_Pays as country,
+            CT_Siret as siret,
+            CT_Identifiant as tvaIntra
           FROM ${SAGE_TABLES.COMPTET} WITH (NOLOCK)
           WHERE CT_Num = @code
         `);
@@ -275,6 +298,8 @@ export const SageService = {
       const pool = await getSqlPool();
       if (!pool || !mssql) return null;
 
+      // Note: Les colonnes LI_* peuvent ne pas exister selon la version de SAGE
+      // On utilise uniquement les colonnes DO_* qui sont standards
       const result = await pool
         .request()
         .input('num', mssql.NVarChar, orderNumber)
@@ -287,7 +312,13 @@ export const SageService = {
             DO_DateLivr as deliveryDate,
             DO_Ref as reference,
             DO_TotalHT as totalHT,
-            DO_TotalTTC as totalTTC
+            DO_TotalTTC as totalTTC,
+            DO_Expedit as expeditionMode,
+            DO_Condition as paymentCondition,
+            DO_Devise as devise,
+            DO_Taxe1 as taxRate1,
+            DO_Taxe2 as taxRate2,
+            DO_Taxe3 as taxRate3
           FROM ${SAGE_TABLES.DOCENTETE} WITH (NOLOCK)
           WHERE DO_Piece = @num
         `);
@@ -306,6 +337,14 @@ export const SageService = {
         totalHT: row.totalHT || 0,
         totalTTC: row.totalTTC || 0,
         status: deriveOrderStatus(row.documentType),
+        // Champs supplémentaires
+        expeditionMode: row.expeditionMode,
+        paymentCondition: row.paymentCondition,
+        devise: row.devise,
+        taxRate1: row.taxRate1,
+        taxRate2: row.taxRate2,
+        taxRate3: row.taxRate3,
+        // Note: L'adresse de livraison sera récupérée depuis le client si nécessaire
       };
 
       setCache(cacheKey, order);
@@ -318,11 +357,13 @@ export const SageService = {
 
   /**
    * Récupère les lignes d'une commande
+   * @param orderNumber - Numéro de pièce (DO_Piece)
+   * @param documentType - Type de document (1=BC, 3=BL, 6=FA) - optionnel mais recommandé
    */
-  async getOrderLines(orderNumber: string): Promise<SageOrderLine[]> {
+  async getOrderLines(orderNumber: string, documentType?: number): Promise<SageOrderLine[]> {
     if (!orderNumber) return [];
 
-    const cacheKey = `orderlines:${orderNumber}`;
+    const cacheKey = `orderlines:${orderNumber}:${documentType || 'all'}`;
     const cached = getCached<SageOrderLine[]>(cacheKey);
     if (cached) return cached;
 
@@ -330,21 +371,44 @@ export const SageService = {
       const pool = await getSqlPool();
       if (!pool || !mssql) return [];
 
-      const result = await pool
-        .request()
-        .input('num', mssql.NVarChar, orderNumber)
-        .query(`
-          SELECT
-            DL_Ligne as lineNumber,
-            AR_Ref as productCode,
-            DL_Design as productName,
-            DL_Qte as quantity,
-            DL_PrixUnitaire as unitPrice,
-            DL_MontantHT as totalHT
-          FROM ${SAGE_TABLES.DOCLIGNE} WITH (NOLOCK)
-          WHERE DO_Piece = @num
-          ORDER BY DL_Ligne
-        `);
+      console.log('[SAGE] ====== getOrderLines ======');
+      console.log('[SAGE] Paramètres: DO_Piece =', orderNumber, '| DO_Type =', documentType);
+
+      // Si on a le type de document, on filtre aussi par DO_Type
+      // Car dans SAGE, le même DO_Piece peut exister pour différents types
+      let query = `
+        SELECT
+          DL_Ligne as lineNumber,
+          AR_Ref as productCode,
+          DL_Design as productName,
+          DL_Qte as quantity,
+          DL_PrixUnitaire as unitPrice,
+          DL_MontantHT as totalHT,
+          DO_Type as docType
+        FROM ${SAGE_TABLES.DOCLIGNE} WITH (NOLOCK)
+        WHERE DO_Piece = @num
+      `;
+
+      if (documentType !== undefined) {
+        query += ` AND DO_Type = @docType`;
+      }
+
+      query += ` ORDER BY DL_Ligne`;
+
+      console.log('[SAGE] Requête SQL:', query.replace(/\s+/g, ' ').trim());
+
+      const request = pool.request().input('num', mssql.NVarChar, orderNumber);
+
+      if (documentType !== undefined) {
+        request.input('docType', mssql.Int, documentType);
+      }
+
+      const result = await request.query(query);
+
+      console.log('[SAGE] Résultat: ', result.recordset.length, 'lignes trouvées');
+      if (result.recordset.length > 0) {
+        console.log('[SAGE] Première ligne:', JSON.stringify(result.recordset[0]));
+      }
 
       const lines: SageOrderLine[] = result.recordset;
       setCache(cacheKey, lines);

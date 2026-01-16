@@ -319,6 +319,35 @@ export const ordersApi = {
     const response = await api.get<ApiResponse<Order>>(`/orders/number/${orderNumber}`);
     return response.data.data;
   },
+
+  // Download invoice/order PDF
+  downloadInvoice: async (orderNumber: string): Promise<void> => {
+    const response = await api.get(`/client/orders/${orderNumber}/invoice`, {
+      responseType: 'blob',
+    });
+
+    // Créer un lien de téléchargement
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    // Récupérer le nom du fichier depuis les headers si disponible
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = `document_${orderNumber}.pdf`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 // ============================================

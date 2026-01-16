@@ -249,9 +249,9 @@ async function upsertOrder(
     orderStatus = 'created';
   }
 
-  // Synchroniser les lignes de commande
+  // Synchroniser les lignes de commande (avec DO_Type pour filtrer correctement)
   try {
-    const sageLines = await SageService.getOrderLines(sageOrder.documentNumber);
+    const sageLines = await SageService.getOrderLines(sageOrder.documentNumber, sageOrder.documentType);
     const lineResult = await syncOrderLines(orderId, sageLines);
     linesCreated = lineResult.created;
     linesUpdated = lineResult.updated;

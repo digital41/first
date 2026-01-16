@@ -119,8 +119,8 @@ router.get('/order/:number', (async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Récupérer aussi les lignes de commande
-    const lines = await SageService.getOrderLines(orderNumber);
+    // Récupérer aussi les lignes de commande (avec DO_Type pour filtrer correctement)
+    const lines = await SageService.getOrderLines(orderNumber, order.documentType);
     order.lines = lines;
 
     res.json({

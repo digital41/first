@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import { prisma } from '../config/database.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { SageService } from '../services/sage.service.js';
+import { generateInvoicePDF } from '../services/invoice-pdf.service.js';
 
 // ============================================
 // CONTROLLER COMMANDES
@@ -42,9 +43,10 @@ export async function getOrders(
       const sageOrders = await SageService.getCustomerOrders(customerCode);
 
       // Récupérer les lignes de commande pour chaque commande
+      // Important: Dans SAGE, il faut filtrer par DO_Piece ET DO_Type
       const ordersWithLines = await Promise.all(
         sageOrders.map(async (order) => {
-          const lines = await SageService.getOrderLines(order.documentNumber);
+          const lines = await SageService.getOrderLines(order.documentNumber, order.documentType);
           // Transformer pour le frontend (utilise orderNumber au lieu de documentNumber)
           return {
             ...order,
@@ -151,12 +153,12 @@ export async function getOrderById(
         return;
       }
 
-      // Récupérer les lignes de commande
-      const lines = await SageService.getOrderLines(id);
+      // Récupérer les lignes de commande (avec DO_Type pour filtrer correctement)
+      const lines = await SageService.getOrderLines(id, sageOrder.documentType);
 
       res.json({
         success: true,
-        data: { ...sageOrder, lines },
+        data: { ...sageOrder, orderNumber: sageOrder.documentNumber, lines },
         source: 'SAGE',
       });
       return;
@@ -333,5 +335,68 @@ export async function lookupOrder(
   } catch (error) {
     console.error('[Lookup Order Error]', error);
     res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+}
+
+/**
+ * GET /api/client/orders/:orderNumber/invoice
+ * Télécharger la facture/bon de commande en PDF
+ * Réservé aux clients authentifiés pour leurs propres commandes SAGE
+ */
+export async function downloadInvoicePDF(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  try {
+    const orderNumber = req.params.orderNumber as string;
+    const { role, customerCode } = req.user;
+
+    console.log('[Invoice PDF] Demande pour commande:', orderNumber, 'client:', customerCode);
+
+    // Vérifier que c'est un client avec un code client
+    if (role !== 'CUSTOMER' || !customerCode) {
+      console.log('[Invoice PDF] Accès refusé - pas un client');
+      res.status(403).json({ success: false, error: 'Accès réservé aux clients' });
+      return;
+    }
+
+    // Vérifier que la commande existe et appartient au client
+    console.log('[Invoice PDF] Recherche commande SAGE...');
+    const sageOrder = await SageService.getOrderByNumber(orderNumber);
+
+    if (!sageOrder) {
+      console.log('[Invoice PDF] Commande non trouvée dans SAGE');
+      res.status(404).json({ success: false, error: 'Commande non trouvée' });
+      return;
+    }
+
+    console.log('[Invoice PDF] Commande trouvée:', sageOrder.documentNumber, 'client:', sageOrder.customerCode);
+
+    if (sageOrder.customerCode !== customerCode) {
+      console.log('[Invoice PDF] Code client ne correspond pas');
+      res.status(403).json({ success: false, error: 'Accès refusé à cette commande' });
+      return;
+    }
+
+    // Générer le PDF
+    console.log('[Invoice PDF] Génération du PDF...');
+    const pdfBuffer = await generateInvoicePDF(orderNumber, customerCode);
+    console.log('[Invoice PDF] PDF généré, taille:', pdfBuffer.length, 'bytes');
+
+    // Envoyer le PDF
+    const filename = `${sageOrder.documentTypeLabel}_${orderNumber}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    console.log('[Invoice PDF] Envoi du fichier:', filename);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('[Download Invoice PDF Error]', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur lors de la génération du PDF'
+    });
   }
 }

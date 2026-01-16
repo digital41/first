@@ -51,6 +51,9 @@ router.post('/tickets/:ticketId/messages', auth, messageController.createMessage
 // Rechercher ses commandes
 router.get('/orders', auth, orderController.getOrders as unknown as RequestHandler);
 
+// Télécharger la facture/bon de commande en PDF
+router.get('/orders/:orderNumber/invoice', auth, orderController.downloadInvoicePDF as unknown as RequestHandler);
+
 // Voir une commande spécifique
 router.get('/orders/:id', auth, orderController.getOrderById as unknown as RequestHandler);
 

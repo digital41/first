@@ -14,7 +14,9 @@ import {
   FileText,
   ChevronRight,
   Receipt,
-  ShoppingCart
+  ShoppingCart,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { ordersApi } from '@/services/api';
 import { Order } from '@/types';
@@ -200,6 +202,7 @@ export function OrderDetailPage() {
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -217,6 +220,21 @@ export function OrderDetailPage() {
 
     fetchOrder();
   }, [id, navigate]);
+
+  // Télécharger la facture en PDF
+  const handleDownloadInvoice = async () => {
+    if (!order?.orderNumber) return;
+
+    setIsDownloading(true);
+    try {
+      await ordersApi.downloadInvoice(order.orderNumber);
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      alert('Erreur lors du téléchargement du document');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   if (isLoading) {
     return <PageLoading />;
@@ -283,13 +301,30 @@ export function OrderDetailPage() {
               <p className="text-gray-600 mt-1">{order.companyName}</p>
             )}
           </div>
-          <Link
-            to={`/tickets/new?orderNumber=${order.orderNumber}`}
-            className="btn-primary"
-          >
-            <PlusCircle size={18} className="mr-2" />
-            Signaler un problème
-          </Link>
+          <div className="flex gap-3">
+            {/* Bouton télécharger PDF */}
+            <button
+              onClick={handleDownloadInvoice}
+              disabled={isDownloading}
+              className="btn-outline flex items-center"
+            >
+              {isDownloading ? (
+                <Loader2 size={18} className="mr-2 animate-spin" />
+              ) : (
+                <Download size={18} className="mr-2" />
+              )}
+              {isDownloading ? 'Téléchargement...' : 'Télécharger PDF'}
+            </button>
+
+            {/* Bouton signaler problème */}
+            <Link
+              to={`/tickets/new?orderNumber=${order.orderNumber}`}
+              className="btn-primary"
+            >
+              <PlusCircle size={18} className="mr-2" />
+              Signaler un problème
+            </Link>
+          </div>
         </div>
       </div>
 
