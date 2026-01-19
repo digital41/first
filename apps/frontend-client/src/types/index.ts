@@ -58,7 +58,10 @@ export interface User {
   displayName: string;
   role: UserRole;
   avatarUrl?: string;
-  phoneNumber?: string;
+  phone?: string;           // Nom du champ backend
+  phoneNumber?: string;     // Alias pour compatibilité
+  customerCode?: string;    // Code client SAGE
+  companyName?: string;     // Nom de la société
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

@@ -30,26 +30,15 @@ export function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [ticketsResponse, ordersResponse] = await Promise.all([
+        // Récupérer en parallèle : tickets récents, commandes, et stats (tous statuts)
+        const [ticketsResponse, ordersResponse, statsResponse] = await Promise.all([
           ticketsApi.getAll({ limit: 5 }),
           ordersApi.getAll(),
+          ticketsApi.getMyStats(), // Endpoint dédié qui inclut TOUS les tickets y compris résolus
         ]);
         setRecentTickets(ticketsResponse?.data || []);
         setRecentOrders((ordersResponse || []).slice(0, 3));
-
-        // Calculate stats from tickets
-        const allTickets = await ticketsApi.getAll({ limit: 100 });
-        const ticketsData = allTickets?.data || [];
-        const calculatedStats: TicketStats = {
-          total: allTickets?.meta?.total || ticketsData.length,
-          open: ticketsData.filter(t => t.status === 'OPEN').length,
-          inProgress: ticketsData.filter(t => t.status === 'IN_PROGRESS').length,
-          waitingCustomer: ticketsData.filter(t => t.status === 'WAITING_CUSTOMER').length,
-          resolved: ticketsData.filter(t => t.status === 'RESOLVED').length,
-          closed: ticketsData.filter(t => t.status === 'CLOSED').length,
-          slaBreached: ticketsData.filter(t => t.slaBreached).length,
-        };
-        setStats(calculatedStats);
+        setStats(statsResponse);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {

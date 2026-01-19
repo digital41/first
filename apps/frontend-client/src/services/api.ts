@@ -195,6 +195,12 @@ export const authApi = {
   isAuthenticated: (): boolean => {
     return !!getAccessToken();
   },
+
+  // Update profile
+  updateProfile: async (data: { displayName?: string; phone?: string }): Promise<User> => {
+    const response = await api.put<ApiResponse<{ user: User }>>('/auth/me', data);
+    return response.data.data.user;
+  },
 };
 
 // ============================================
@@ -238,9 +244,15 @@ export const ticketsApi = {
     return response.data.data;
   },
 
-  // Get ticket stats
+  // Get ticket stats (admin)
   getStats: async (): Promise<TicketStats> => {
     const response = await api.get<ApiResponse<TicketStats>>('/tickets/stats');
+    return response.data.data;
+  },
+
+  // Get my ticket stats (client - inclut tous les statuts pour KPIs)
+  getMyStats: async (): Promise<TicketStats> => {
+    const response = await api.get<ApiResponse<TicketStats>>('/client/tickets/my-stats');
     return response.data.data;
   },
 

@@ -262,7 +262,15 @@ export async function listTickets(
 
   const where: Record<string, unknown> = {};
 
-  if (status) where.status = status;
+  // Exclure les tickets résolus par défaut pour tous (sauf si filtre explicite)
+  // Cela s'applique aux clients ET aux admins/agents
+  if (status) {
+    where.status = status;
+  } else {
+    // Par défaut: ne pas montrer les tickets RESOLVED
+    where.status = { not: 'RESOLVED' };
+  }
+
   if (issueType) where.issueType = issueType;
   if (priority) where.priority = priority;
   if (assignedToId) where.assignedToId = assignedToId;
@@ -481,9 +489,50 @@ export async function updateTicket(
 }
 
 /**
- * Statistiques des tickets (dashboard admin)
+ * Statistiques des tickets pour un client (dashboard client)
+ * Inclut TOUS les tickets y compris résolus pour les KPIs
  */
-export async function getTicketStats(): Promise<{
+export async function getClientTicketStats(customerId: string): Promise<{
+  total: number;
+  open: number;
+  inProgress: number;
+  waitingCustomer: number;
+  resolved: number;
+  closed: number;
+  slaBreached: number;
+}> {
+  const [tickets, slaBreachedCount] = await Promise.all([
+    prisma.ticket.groupBy({
+      by: ['status'],
+      where: { customerId },
+      _count: true,
+    }),
+    prisma.ticket.count({
+      where: { customerId, slaBreached: true },
+    }),
+  ]);
+
+  const statusCounts = Object.fromEntries(
+    tickets.map((t) => [t.status, t._count])
+  );
+
+  return {
+    total: tickets.reduce((sum, t) => sum + t._count, 0),
+    open: (statusCounts['OPEN'] || 0) + (statusCounts['REOPENED'] || 0),
+    inProgress: (statusCounts['IN_PROGRESS'] || 0) + (statusCounts['ESCALATED'] || 0),
+    waitingCustomer: statusCounts['WAITING_CUSTOMER'] || 0,
+    resolved: statusCounts['RESOLVED'] || 0,
+    closed: statusCounts['CLOSED'] || 0,
+    slaBreached: slaBreachedCount,
+  };
+}
+
+/**
+ * Statistiques des tickets (dashboard admin/agent)
+ * @param assignedToId - Si fourni, filtre les stats par agent assigné (pour les agents)
+ *                       Si non fourni, retourne les stats globales (pour les admins)
+ */
+export async function getTicketStats(assignedToId?: string): Promise<{
   total: number;
   byStatus: Record<string, number>;
   byType: Record<string, number>;
@@ -494,26 +543,32 @@ export async function getTicketStats(): Promise<{
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Filtre optionnel par agent assigné
+  const whereAgent = assignedToId ? { assignedToId } : {};
+
   const [total, byStatus, byType, byPriority, openedToday, slaBreached] =
     await Promise.all([
-      prisma.ticket.count(),
+      prisma.ticket.count({ where: whereAgent }),
       prisma.ticket.groupBy({
         by: ['status'],
+        where: whereAgent,
         _count: true,
       }),
       prisma.ticket.groupBy({
         by: ['issueType'],
+        where: whereAgent,
         _count: true,
       }),
       prisma.ticket.groupBy({
         by: ['priority'],
+        where: whereAgent,
         _count: true,
       }),
       prisma.ticket.count({
-        where: { createdAt: { gte: today } },
+        where: { ...whereAgent, createdAt: { gte: today } },
       }),
       prisma.ticket.count({
-        where: { slaBreached: true },
+        where: { ...whereAgent, slaBreached: true },
       }),
     ]);
 

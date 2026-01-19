@@ -61,7 +61,8 @@ export const SAGE_TABLES = {
 
   // Types de documents
   DOC_TYPES: {
-    BC: 1,   // Bon de commande
+    BC: 1,   // Bon de commande (devis - exclu de "mes commandes")
+    BP: 2,   // Bon de préparation (PL)
     BL: 3,   // Bon de livraison
     FA: 6,   // Facture
   },

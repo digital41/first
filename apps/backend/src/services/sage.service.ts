@@ -244,6 +244,8 @@ export const SageService = {
       const pool = await getSqlPool();
       if (!pool || !mssql) return [];
 
+      // Note: On exclut les BC (type 1) car ce sont des devis, pas des commandes validées
+      // On ne garde que les BP (2), BL (3) et FA (6) des 12 derniers mois
       const result = await pool
         .request()
         .input('code', mssql.NVarChar, customerCode)
@@ -259,7 +261,8 @@ export const SageService = {
             DO_TotalTTC as totalTTC
           FROM ${SAGE_TABLES.DOCENTETE} WITH (NOLOCK)
           WHERE DO_Tiers = @code
-          AND DO_Type IN (1, 3, 6)
+          AND DO_Type IN (2, 3, 6)
+          AND DO_Date >= DATEADD(year, -1, GETDATE())
           ORDER BY DO_Date DESC
         `);
 
@@ -672,6 +675,7 @@ export const SageService = {
 function getDocumentTypeLabel(type: number): string {
   switch (type) {
     case SAGE_TABLES.DOC_TYPES.BC: return 'BC';
+    case SAGE_TABLES.DOC_TYPES.BP: return 'BP';
     case SAGE_TABLES.DOC_TYPES.BL: return 'BL';
     case SAGE_TABLES.DOC_TYPES.FA: return 'FA';
     default: return 'DOC';
@@ -681,6 +685,7 @@ function getDocumentTypeLabel(type: number): string {
 function deriveOrderStatus(docType: number): string {
   switch (docType) {
     case SAGE_TABLES.DOC_TYPES.BC: return 'EN_COURS';
+    case SAGE_TABLES.DOC_TYPES.BP: return 'EN_PREPARATION';
     case SAGE_TABLES.DOC_TYPES.BL: return 'LIVREE';
     case SAGE_TABLES.DOC_TYPES.FA: return 'FACTUREE';
     default: return 'INCONNU';

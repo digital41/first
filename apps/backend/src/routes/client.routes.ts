@@ -22,10 +22,13 @@ const auth = authenticate as unknown as RequestHandler;
 // TICKETS CLIENT
 // ============================================
 
+// Stats des tickets client (pour KPIs dashboard - inclut tous les statuts)
+router.get('/tickets/my-stats', auth, ticketController.myStats as unknown as RequestHandler);
+
 // Créer un ticket (client)
 router.post('/tickets', auth, ticketController.create as unknown as RequestHandler);
 
-// Voir ses propres tickets
+// Voir ses propres tickets (exclut les résolus par défaut)
 router.get('/tickets', auth, ticketController.list as unknown as RequestHandler);
 
 // Voir un ticket spécifique (le middleware vérifie que c'est bien le sien)

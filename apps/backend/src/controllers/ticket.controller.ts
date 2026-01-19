@@ -130,15 +130,42 @@ export async function update(
 
 /**
  * GET /api/tickets/stats
- * Statistiques des tickets (admin uniquement)
+ * Statistiques des tickets
+ * - ADMIN/SUPERVISOR: stats globales de tous les tickets
+ * - AGENT: stats uniquement de ses tickets assignés
  */
 export async function stats(
-  _req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const statistics = await ticketService.getTicketStats();
+    const { role, id } = req.user;
+
+    // Pour les agents: filtrer par leurs tickets assignés
+    // Pour admin/supervisor: voir toutes les stats
+    const assignedToId = ['ADMIN', 'SUPERVISOR'].includes(role) ? undefined : id;
+
+    const statistics = await ticketService.getTicketStats(assignedToId);
+
+    sendSuccess(res, statistics);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/client/tickets/my-stats
+ * Statistiques des tickets pour le client connecté (inclut tous les statuts pour KPIs)
+ */
+export async function myStats(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const customerId = req.user.id;
+    const statistics = await ticketService.getClientTicketStats(customerId);
 
     sendSuccess(res, statistics);
   } catch (error) {
