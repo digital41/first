@@ -39,31 +39,39 @@ export async function getOrders(
         return;
       }
 
-      // Récupérer les commandes SAGE
-      const sageOrders = await SageService.getCustomerOrders(customerCode);
+      // Paramètres de requête
+      const forceRefresh = req.query.refresh === 'true';
+      const includeReturns = req.query.returns === 'true';
+      const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+      console.log(`[Orders API] Client ${customerCode}, page=${pageNum}, limit=${limitNum}, year=${year || 'current'}, returns=${includeReturns}`);
 
-      // Récupérer les lignes de commande pour chaque commande
-      // Important: Dans SAGE, il faut filtrer par DO_Piece ET DO_Type
-      const ordersWithLines = await Promise.all(
-        sageOrders.map(async (order) => {
-          const lines = await SageService.getOrderLines(order.documentNumber, order.documentType);
-          // Transformer pour le frontend (utilise orderNumber au lieu de documentNumber)
-          return {
-            ...order,
-            orderNumber: order.documentNumber,
-            lines,
-          };
-        })
+      // Récupérer les commandes SAGE avec pagination SQL (beaucoup plus rapide)
+      const { orders: sageOrders, total } = await SageService.getCustomerOrdersPaginated(
+        customerCode,
+        forceRefresh,
+        includeReturns,
+        year,
+        pageNum,
+        limitNum
       );
 
-      // Pagination côté serveur (les commandes SAGE sont déjà limitées)
-      const total = ordersWithLines.length;
-      const startIndex = (pageNum - 1) * limitNum;
-      const paginatedOrders = ordersWithLines.slice(startIndex, startIndex + limitNum);
+      // Récupérer les lignes de commande en UNE SEULE requête SQL (optimisation)
+      const orderLinesBatch = await SageService.getOrderLinesBatch(
+        sageOrders.map(o => ({ documentNumber: o.documentNumber, documentType: o.documentType }))
+      );
+
+      // Assembler les commandes avec leurs lignes
+      const ordersWithLines = sageOrders.map(order => ({
+        ...order,
+        orderNumber: order.documentNumber,
+        lines: orderLinesBatch.get(order.documentNumber) || [],
+      }));
+
+      console.log(`[Orders API] Page ${pageNum}: ${ordersWithLines.length} commandes sur ${total} total`);
 
       res.json({
         success: true,
-        data: paginatedOrders,
+        data: ordersWithLines,
         source: 'SAGE',
         meta: {
           page: pageNum,

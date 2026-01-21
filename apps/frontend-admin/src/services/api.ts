@@ -692,7 +692,8 @@ export const AdminApi = {
     customerSentiment: 'positive' | 'neutral' | 'negative' | 'frustrated';
     urgencyAssessment: string;
   }> {
-    const response = await fetchWithAuth<{ success: boolean; data: {
+    // fetchWithAuth extracts .data automatically
+    return fetchWithAuth<{
       success: boolean;
       suggestion: string;
       draftResponse: string;
@@ -700,11 +701,10 @@ export const AdminApi = {
       recommendedActions: string[];
       customerSentiment: 'positive' | 'neutral' | 'negative' | 'frustrated';
       urgencyAssessment: string;
-    } }>(`/admin/ai/suggest/${ticketId}`, {
+    }>(`/admin/ai/suggest/${ticketId}`, {
       method: 'POST',
       body: JSON.stringify({ query }),
     });
-    return response.data;
   },
 
   /**
@@ -726,7 +726,8 @@ export const AdminApi = {
     };
     lastCustomerMessage: string | null;
   }> {
-    const response = await fetchWithAuth<{ success: boolean; data: {
+    // fetchWithAuth extracts .data automatically
+    return fetchWithAuth<{
       ticketNumber: number;
       issueType: string;
       priority: string;
@@ -741,10 +742,9 @@ export const AdminApi = {
         errorCode?: string;
       };
       lastCustomerMessage: string | null;
-    } }>(`/admin/ai/analyze/${ticketId}`, {
+    }>(`/admin/ai/analyze/${ticketId}`, {
       method: 'POST',
     });
-    return response.data;
   },
 
   /**
@@ -758,20 +758,17 @@ export const AdminApi = {
     nextSteps: string[];
     resolutionProgress: number;
   }> {
-    const response = await fetchWithAuth<{
-      success: boolean;
-      data: {
-        ticketNumber: number;
-        summary: string;
-        keyIssues: string[];
-        customerMood: string;
-        nextSteps: string[];
-        resolutionProgress: number;
-      };
+    // fetchWithAuth extracts .data automatically
+    return fetchWithAuth<{
+      ticketNumber: number;
+      summary: string;
+      keyIssues: string[];
+      customerMood: string;
+      nextSteps: string[];
+      resolutionProgress: number;
     }>(`/admin/ai/summary/${ticketId}`, {
       method: 'POST',
     });
-    return response.data;
   },
 
   /**
@@ -789,22 +786,20 @@ export const AdminApi = {
       urgentCount: number;
     };
   }> {
+    // fetchWithAuth extracts .data automatically, so we get { message, context } directly
     const response = await fetchWithAuth<{
-      success: boolean;
-      data: {
-        message: string;
-        context: {
-          totalTickets: number;
-          slaBreached: number;
-          unassignedCount: number;
-          urgentCount: number;
-        };
-      }
+      message: string;
+      context: {
+        totalTickets: number;
+        slaBreached: number;
+        unassignedCount: number;
+        urgentCount: number;
+      };
     }>('/admin/ai/chat', {
       method: 'POST',
       body: JSON.stringify({ message, conversationHistory }),
     });
-    return response.data;
+    return response;
   },
 };
 

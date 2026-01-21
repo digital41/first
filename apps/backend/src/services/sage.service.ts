@@ -49,6 +49,13 @@ export interface SageOrder {
   totalTTC: number;            // DO_TotalTTC
   status: string;              // Dérivé
   lines?: SageOrderLine[];
+  // Dates avec heures réelles (SAGE cbCreation/cbModification)
+  createdAt?: Date;            // cbCreation - Date/heure de création du document
+  updatedAt?: Date;            // cbModification - Date/heure de dernière modification
+  // Historique des transformations (dates BP, BL, FA)
+  bpDate?: Date;               // Date de création du BP (préparation)
+  blDate?: Date;               // Date de création du BL (livraison)
+  faDate?: Date;               // Date de création de la Facture
   // Champs supplémentaires pour facturation
   expeditionMode?: string;     // DO_Expedit (mode d'expédition)
   paymentCondition?: string;   // DO_Condition (conditions de paiement)
@@ -229,26 +236,88 @@ export const SageService = {
   },
 
   /**
-   * Récupère les commandes d'un client
+   * Récupère les commandes d'un client avec pagination SQL
    * Retourne tableau vide si erreur (jamais d'exception)
+   * @param customerCode - Code client SAGE
+   * @param forceRefresh - Si true, ignore le cache et fait une requête SAGE fraîche
+   * @param includeReturns - Si true, inclut les retours (BR=4) et avoirs (5)
+   * @param year - Année à filtrer (défaut: année en cours)
+   * @param page - Numéro de page (1-indexed)
+   * @param limit - Nombre de résultats par page
+   * @returns { orders, total } - Commandes et nombre total
    */
-  async getCustomerOrders(customerCode: string): Promise<SageOrder[]> {
-    if (!customerCode) return [];
+  async getCustomerOrdersPaginated(
+    customerCode: string,
+    forceRefresh = false,
+    includeReturns = false,
+    year?: number,
+    page = 1,
+    limit = 5
+  ): Promise<{ orders: SageOrder[]; total: number }> {
+    if (!customerCode) return { orders: [], total: 0 };
 
-    // Check cache first
-    const cacheKey = `orders:${customerCode}`;
-    const cached = getCached<SageOrder[]>(cacheKey);
-    if (cached) return cached;
+    // Année par défaut: année en cours
+    const filterYear = year || new Date().getFullYear();
+    const offset = (page - 1) * limit;
+
+    // Types par défaut: BP(2), BL(3), FA(6), FA_ARCH(7)
+    // Si includeReturns: ajoute BR(4) et AVOIR(5)
+    const docTypes = includeReturns ? '2, 3, 4, 5, 6, 7' : '2, 3, 6, 7';
+
+    // Clé de cache pour le total (compte tous les documents de l'année)
+    const countCacheKey = `orders-count:${customerCode}:${includeReturns ? 'with-returns' : 'standard'}:${filterYear}`;
+    // Clé de cache pour la page
+    const pageCacheKey = `orders-page:${customerCode}:${includeReturns ? 'with-returns' : 'standard'}:${filterYear}:${page}:${limit}`;
+
+    // Vérifier le cache si pas de forceRefresh
+    if (!forceRefresh) {
+      const cachedTotal = getCached<number>(countCacheKey);
+      const cachedOrders = getCached<SageOrder[]>(pageCacheKey);
+      if (cachedTotal !== null && cachedOrders) {
+        console.log(`[SAGE] getCustomerOrdersPaginated: CACHE HIT - page ${page}, ${cachedOrders.length} commandes, total=${cachedTotal}`);
+        return { orders: cachedOrders, total: cachedTotal };
+      }
+    } else {
+      console.log(`[SAGE] getCustomerOrdersPaginated: FORCE REFRESH`);
+      cache.delete(countCacheKey);
+      cache.delete(pageCacheKey);
+    }
+
+    console.log(`[SAGE] getCustomerOrdersPaginated(${customerCode}): page=${page}, limit=${limit}, year=${filterYear}, returns=${includeReturns}`);
 
     try {
       const pool = await getSqlPool();
-      if (!pool || !mssql) return [];
+      if (!pool || !mssql) return { orders: [], total: 0 };
 
-      // Note: On exclut les BC (type 1) car ce sont des devis, pas des commandes validées
-      // On ne garde que les BP (2), BL (3) et FA (6) des 12 derniers mois
+      // 1. Compter le total (requête rapide)
+      const countResult = await pool
+        .request()
+        .input('code', mssql.NVarChar, customerCode)
+        .input('year', mssql.Int, filterYear)
+        .query(`
+          SELECT COUNT(*) as total
+          FROM ${SAGE_TABLES.DOCENTETE} WITH (NOLOCK)
+          WHERE DO_Tiers = @code
+          AND DO_Type IN (${docTypes})
+          AND YEAR(DO_Date) = @year
+        `);
+
+      const total = countResult.recordset[0].total || 0;
+      console.log(`[SAGE] Total commandes pour ${filterYear}: ${total}`);
+
+      // Si aucune commande, retourner vide
+      if (total === 0) {
+        setCache(countCacheKey, 0);
+        return { orders: [], total: 0 };
+      }
+
+      // 2. Récupérer uniquement la page demandée avec OFFSET/FETCH
       const result = await pool
         .request()
         .input('code', mssql.NVarChar, customerCode)
+        .input('year', mssql.Int, filterYear)
+        .input('offset', mssql.Int, offset)
+        .input('limit', mssql.Int, limit)
         .query(`
           SELECT
             DO_Piece as documentNumber,
@@ -258,13 +327,19 @@ export const SageService = {
             DO_DateLivr as deliveryDate,
             DO_Ref as reference,
             DO_TotalHT as totalHT,
-            DO_TotalTTC as totalTTC
+            DO_TotalTTC as totalTTC,
+            cbCreation as createdAt,
+            cbModification as updatedAt
           FROM ${SAGE_TABLES.DOCENTETE} WITH (NOLOCK)
           WHERE DO_Tiers = @code
-          AND DO_Type IN (2, 3, 6)
-          AND DO_Date >= DATEADD(year, -1, GETDATE())
+          AND DO_Type IN (${docTypes})
+          AND YEAR(DO_Date) = @year
           ORDER BY DO_Date DESC
+          OFFSET @offset ROWS
+          FETCH NEXT @limit ROWS ONLY
         `);
+
+      console.log(`[SAGE] Page ${page}: ${result.recordset.length} commandes récupérées`);
 
       const orders: SageOrder[] = result.recordset.map((row: Record<string, unknown>) => ({
         documentNumber: row.documentNumber as string,
@@ -277,14 +352,29 @@ export const SageService = {
         totalHT: row.totalHT as number || 0,
         totalTTC: row.totalTTC as number || 0,
         status: deriveOrderStatus(row.documentType as number),
+        createdAt: row.createdAt as Date | undefined,
+        updatedAt: row.updatedAt as Date | undefined,
       }));
 
-      setCache(cacheKey, orders);
-      return orders;
+      // Mettre en cache
+      setCache(countCacheKey, total);
+      setCache(pageCacheKey, orders);
+
+      return { orders, total };
     } catch (error) {
-      console.error('[SAGE] Erreur getCustomerOrders:', error instanceof Error ? error.message : 'Erreur');
-      return [];
+      console.error('[SAGE] Erreur getCustomerOrdersPaginated:', error instanceof Error ? error.message : 'Erreur');
+      return { orders: [], total: 0 };
     }
+  },
+
+  /**
+   * Récupère les commandes d'un client (version non paginée, pour compatibilité)
+   * @deprecated Utiliser getCustomerOrdersPaginated pour de meilleures performances
+   */
+  async getCustomerOrders(customerCode: string, forceRefresh = false, includeReturns = false, year?: number): Promise<SageOrder[]> {
+    // Déléguer à la version paginée avec une grande limite
+    const { orders } = await this.getCustomerOrdersPaginated(customerCode, forceRefresh, includeReturns, year, 1, 1000);
+    return orders;
   },
 
   /**
@@ -321,7 +411,9 @@ export const SageService = {
             DO_Devise as devise,
             DO_Taxe1 as taxRate1,
             DO_Taxe2 as taxRate2,
-            DO_Taxe3 as taxRate3
+            DO_Taxe3 as taxRate3,
+            cbCreation as createdAt,
+            cbModification as updatedAt
           FROM ${SAGE_TABLES.DOCENTETE} WITH (NOLOCK)
           WHERE DO_Piece = @num
         `);
@@ -329,6 +421,10 @@ export const SageService = {
       if (result.recordset.length === 0) return null;
 
       const row = result.recordset[0];
+
+      // Récupérer les dates de transformation (BL et FA liés)
+      const relatedDates = await this.getRelatedDocumentDates(orderNumber, row.customerCode);
+
       const order: SageOrder = {
         documentNumber: row.documentNumber,
         documentType: row.documentType,
@@ -340,6 +436,13 @@ export const SageService = {
         totalHT: row.totalHT || 0,
         totalTTC: row.totalTTC || 0,
         status: deriveOrderStatus(row.documentType),
+        // Dates avec heures réelles
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        // Dates de transformation (BP, BL et FA liés)
+        bpDate: relatedDates.bpDate,
+        blDate: relatedDates.blDate,
+        faDate: relatedDates.faDate,
         // Champs supplémentaires
         expeditionMode: row.expeditionMode,
         paymentCondition: row.paymentCondition,
@@ -359,6 +462,94 @@ export const SageService = {
   },
 
   /**
+   * Récupère les dates de transformation d'un document (BP, BL et FA liés)
+   * Dans SAGE, quand un document est transformé (BC -> BP -> BL -> FA),
+   * les documents sont liés via DO_Ref ou partagent le même suffixe numérique
+   * @param orderNumber - Numéro de pièce (ex: F26010226)
+   * @param customerCode - Code client pour filtrer
+   * @returns Les dates de création du BP, BL et FA liés (si trouvés)
+   */
+  async getRelatedDocumentDates(
+    orderNumber: string,
+    customerCode: string
+  ): Promise<{ bpDate?: Date; blDate?: Date; faDate?: Date }> {
+    if (!orderNumber || !customerCode) return {};
+
+    // Vérifier le cache d'abord
+    const cacheKey = `related-dates:${orderNumber}`;
+    const cached = getCached<{ bpDate?: Date; blDate?: Date; faDate?: Date }>(cacheKey);
+    if (cached) {
+      console.log(`[SAGE] getRelatedDocumentDates(${orderNumber}): CACHE HIT`);
+      return cached;
+    }
+
+    try {
+      const pool = await getSqlPool();
+      if (!pool || !mssql) return {};
+
+      // Extraire le suffixe numérique du document (ex: F26010226 -> 26010226)
+      const numericSuffix = orderNumber.replace(/^[A-Za-z]+/, '');
+
+      console.log(`[SAGE] getRelatedDocumentDates: Recherche documents liés pour ${orderNumber}`);
+
+      // Stratégie 1: Chercher les documents qui référencent ce document (DO_Ref)
+      // Stratégie 2: Chercher les documents avec le même suffixe numérique
+      // Stratégie 3: Chercher le document référencé par ce document
+      const result = await pool
+        .request()
+        .input('code', mssql.NVarChar, customerCode)
+        .input('docNum', mssql.NVarChar, orderNumber)
+        .input('suffix', mssql.NVarChar, numericSuffix ? `%${numericSuffix}` : '')
+        .query(`
+          SELECT DISTINCT
+            DO_Piece as documentNumber,
+            DO_Type as documentType,
+            DO_Ref as reference,
+            cbCreation as createdAt
+          FROM ${SAGE_TABLES.DOCENTETE} WITH (NOLOCK)
+          WHERE DO_Tiers = @code
+          AND DO_Type IN (2, 3, 6, 7)
+          AND DO_Piece != @docNum
+          AND (
+            -- Documents qui référencent notre document
+            DO_Ref = @docNum
+            -- Documents référencés par notre document (via sous-requête)
+            OR DO_Piece IN (
+              SELECT DO_Ref FROM ${SAGE_TABLES.DOCENTETE} WITH (NOLOCK)
+              WHERE DO_Piece = @docNum AND DO_Ref IS NOT NULL AND DO_Ref != ''
+            )
+            -- Documents avec le même suffixe numérique
+            ${numericSuffix ? 'OR DO_Piece LIKE @suffix' : ''}
+          )
+          ORDER BY DO_Type ASC
+        `);
+
+      let bpDate: Date | undefined;
+      let blDate: Date | undefined;
+      let faDate: Date | undefined;
+
+      for (const row of result.recordset) {
+        console.log(`[SAGE] Document lié trouvé: ${row.documentNumber} (type=${row.documentType}, ref=${row.reference}, created=${row.createdAt})`);
+        if (row.documentType === 2 && !bpDate) {
+          bpDate = row.createdAt;
+        } else if (row.documentType === 3 && !blDate) {
+          blDate = row.createdAt;
+        } else if ((row.documentType === 6 || row.documentType === 7) && !faDate) {
+          faDate = row.createdAt;
+        }
+      }
+
+      console.log(`[SAGE] Dates trouvées: BP=${bpDate}, BL=${blDate}, FA=${faDate}`);
+      const dates = { bpDate, blDate, faDate };
+      setCache(cacheKey, dates);
+      return dates;
+    } catch (error) {
+      console.error('[SAGE] Erreur getRelatedDocumentDates:', error instanceof Error ? error.message : 'Erreur');
+      return {};
+    }
+  },
+
+  /**
    * Récupère les lignes d'une commande
    * @param orderNumber - Numéro de pièce (DO_Piece)
    * @param documentType - Type de document (1=BC, 3=BL, 6=FA) - optionnel mais recommandé
@@ -374,11 +565,6 @@ export const SageService = {
       const pool = await getSqlPool();
       if (!pool || !mssql) return [];
 
-      console.log('[SAGE] ====== getOrderLines ======');
-      console.log('[SAGE] Paramètres: DO_Piece =', orderNumber, '| DO_Type =', documentType);
-
-      // Si on a le type de document, on filtre aussi par DO_Type
-      // Car dans SAGE, le même DO_Piece peut exister pour différents types
       let query = `
         SELECT
           DL_Ligne as lineNumber,
@@ -398,8 +584,6 @@ export const SageService = {
 
       query += ` ORDER BY DL_Ligne`;
 
-      console.log('[SAGE] Requête SQL:', query.replace(/\s+/g, ' ').trim());
-
       const request = pool.request().input('num', mssql.NVarChar, orderNumber);
 
       if (documentType !== undefined) {
@@ -407,18 +591,109 @@ export const SageService = {
       }
 
       const result = await request.query(query);
-
-      console.log('[SAGE] Résultat: ', result.recordset.length, 'lignes trouvées');
-      if (result.recordset.length > 0) {
-        console.log('[SAGE] Première ligne:', JSON.stringify(result.recordset[0]));
-      }
-
       const lines: SageOrderLine[] = result.recordset;
       setCache(cacheKey, lines);
       return lines;
     } catch (error) {
       console.error('[SAGE] Erreur getOrderLines:', error instanceof Error ? error.message : 'Erreur');
       return [];
+    }
+  },
+
+  /**
+   * Récupère les lignes de PLUSIEURS commandes en une seule requête SQL
+   * Optimisation: 1 requête au lieu de N requêtes
+   * @param orders - Liste de { documentNumber, documentType }
+   * @returns Map<documentNumber, SageOrderLine[]>
+   */
+  async getOrderLinesBatch(orders: Array<{ documentNumber: string; documentType: number }>): Promise<Map<string, SageOrderLine[]>> {
+    const result = new Map<string, SageOrderLine[]>();
+    if (!orders || orders.length === 0) return result;
+
+    // Vérifier le cache pour chaque commande
+    const uncachedOrders: Array<{ documentNumber: string; documentType: number }> = [];
+    for (const order of orders) {
+      const cacheKey = `orderlines:${order.documentNumber}:${order.documentType}`;
+      const cached = getCached<SageOrderLine[]>(cacheKey);
+      if (cached) {
+        result.set(order.documentNumber, cached);
+      } else {
+        uncachedOrders.push(order);
+      }
+    }
+
+    // Si tout est en cache, retourner directement
+    if (uncachedOrders.length === 0) {
+      console.log(`[SAGE] getOrderLinesBatch: CACHE HIT pour ${orders.length} commandes`);
+      return result;
+    }
+
+    console.log(`[SAGE] getOrderLinesBatch: ${uncachedOrders.length}/${orders.length} commandes à charger depuis SAGE`);
+
+    try {
+      const pool = await getSqlPool();
+      if (!pool || !mssql) return result;
+
+      // Construire la requête avec UNION de conditions pour chaque document
+      // Chaque document a son propre DO_Piece + DO_Type
+      const conditions = uncachedOrders.map((_, i) =>
+        `(DO_Piece = @piece${i} AND DO_Type = @type${i})`
+      ).join(' OR ');
+
+      const query = `
+        SELECT
+          DO_Piece as documentNumber,
+          DL_Ligne as lineNumber,
+          AR_Ref as productCode,
+          DL_Design as productName,
+          DL_Qte as quantity,
+          DL_PrixUnitaire as unitPrice,
+          DL_MontantHT as totalHT,
+          DO_Type as docType
+        FROM ${SAGE_TABLES.DOCLIGNE} WITH (NOLOCK)
+        WHERE ${conditions}
+        ORDER BY DO_Piece, DL_Ligne
+      `;
+
+      const request = pool.request();
+      uncachedOrders.forEach((order, i) => {
+        request.input(`piece${i}`, mssql.NVarChar, order.documentNumber);
+        request.input(`type${i}`, mssql.Int, order.documentType);
+      });
+
+      const queryResult = await request.query(query);
+
+      // Grouper les résultats par documentNumber
+      const linesByDoc = new Map<string, SageOrderLine[]>();
+      for (const row of queryResult.recordset) {
+        const docNum = row.documentNumber as string;
+        if (!linesByDoc.has(docNum)) {
+          linesByDoc.set(docNum, []);
+        }
+        linesByDoc.get(docNum)!.push({
+          lineNumber: row.lineNumber,
+          productCode: row.productCode,
+          productName: row.productName,
+          quantity: row.quantity,
+          unitPrice: row.unitPrice,
+          totalHT: row.totalHT,
+        });
+      }
+
+      // Mettre en cache et ajouter au résultat
+      for (const order of uncachedOrders) {
+        const lines = linesByDoc.get(order.documentNumber) || [];
+        const cacheKey = `orderlines:${order.documentNumber}:${order.documentType}`;
+        setCache(cacheKey, lines);
+        result.set(order.documentNumber, lines);
+      }
+
+      console.log(`[SAGE] getOrderLinesBatch: ${queryResult.recordset.length} lignes récupérées pour ${uncachedOrders.length} commandes`);
+
+      return result;
+    } catch (error) {
+      console.error('[SAGE] Erreur getOrderLinesBatch:', error instanceof Error ? error.message : 'Erreur');
+      return result;
     }
   },
 
@@ -674,20 +949,28 @@ export const SageService = {
 
 function getDocumentTypeLabel(type: number): string {
   switch (type) {
+    case SAGE_TABLES.DOC_TYPES.DEVIS: return 'DEVIS';
     case SAGE_TABLES.DOC_TYPES.BC: return 'BC';
     case SAGE_TABLES.DOC_TYPES.BP: return 'BP';
     case SAGE_TABLES.DOC_TYPES.BL: return 'BL';
+    case SAGE_TABLES.DOC_TYPES.BR: return 'BR';
+    case SAGE_TABLES.DOC_TYPES.AVOIR: return 'AVOIR';
     case SAGE_TABLES.DOC_TYPES.FA: return 'FA';
+    case SAGE_TABLES.DOC_TYPES.FA_ARCH: return 'FA';
     default: return 'DOC';
   }
 }
 
 function deriveOrderStatus(docType: number): string {
   switch (docType) {
+    case SAGE_TABLES.DOC_TYPES.DEVIS: return 'DEVIS';
     case SAGE_TABLES.DOC_TYPES.BC: return 'EN_COURS';
     case SAGE_TABLES.DOC_TYPES.BP: return 'EN_PREPARATION';
     case SAGE_TABLES.DOC_TYPES.BL: return 'LIVREE';
+    case SAGE_TABLES.DOC_TYPES.BR: return 'RETOUR';
+    case SAGE_TABLES.DOC_TYPES.AVOIR: return 'AVOIR';
     case SAGE_TABLES.DOC_TYPES.FA: return 'FACTUREE';
+    case SAGE_TABLES.DOC_TYPES.FA_ARCH: return 'FACTUREE';
     default: return 'INCONNU';
   }
 }

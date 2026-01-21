@@ -6,7 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "install:all": "npm install && cd apps/backend && npm install && cd ../frontend-client && npm install && cd ../frontend-admin && npm install",
+    "test:backend": "cd apps/backend && npm test",
+    "test:frontend": "cd apps/frontend-client && npm test",
+    "test:admin": "cd apps/frontend-admin && npm test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "test:all": "npm run test:backend && npm run test:frontend && npm run test:admin"
   },
   "dependencies": {
     "react-dom": "^19.2.1",
@@ -16,6 +24,7 @@
     "@emailjs/browser": "3.12.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",

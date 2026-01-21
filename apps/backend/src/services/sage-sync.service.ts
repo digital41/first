@@ -15,8 +15,9 @@ import { sageConfig, isSageConfigValid } from '../config/sage.config.js';
 // CONFIGURATION
 // ============================================
 
-// Nombre de jours à synchroniser (pour attraper les mises à jour)
-const SYNC_DAYS_BACK = 7;
+// Note: La période de synchronisation est définie dans sage.service.ts
+// Actuellement configuré pour récupérer les données sur 1 AN (12 mois)
+// Voir: getCustomerOrders() -> DATEADD(year, -1, GETDATE())
 
 // Statistiques de la dernière synchronisation
 interface SyncStats {

@@ -304,6 +304,16 @@ interface OrdersResponse {
   };
 }
 
+export interface OrdersApiResponse {
+  data: Order[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export const ordersApi = {
   // Lookup order (public)
   lookup: async (orderNumber: string, email: string): Promise<Order> => {
@@ -314,10 +324,36 @@ export const ordersApi = {
     return response.data.data;
   },
 
-  // Get user orders (from SAGE for customers)
-  getAll: async (page = 1, limit = 50): Promise<Order[]> => {
-    const response = await api.get<OrdersResponse>(`/client/orders?page=${page}&limit=${limit}`);
-    return response.data.data || [];
+  // Get user orders with pagination (from SAGE for customers)
+  // refresh=true force une requête fraîche vers SAGE (bypass cache)
+  // returns=true inclut les retours et avoirs
+  // year = année à filtrer (défaut: année en cours)
+  getAllPaginated: async (page = 1, limit = 5, refresh = false, includeReturns = false, year?: number): Promise<OrdersApiResponse> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    if (refresh) {
+      params.append('refresh', 'true');
+    }
+    if (includeReturns) {
+      params.append('returns', 'true');
+    }
+    if (year) {
+      params.append('year', year.toString());
+    }
+    const response = await api.get<OrdersResponse>(`/client/orders?${params.toString()}`);
+    return {
+      data: response.data.data || [],
+      meta: response.data.meta || { page: 1, limit, total: 0, totalPages: 0 },
+    };
+  },
+
+  // Get user orders (legacy, returns only data)
+  // @deprecated Use getAllPaginated for better pagination support
+  getAll: async (page = 1, limit = 50, refresh = false, includeReturns = false, year?: number): Promise<Order[]> => {
+    const result = await ordersApi.getAllPaginated(page, limit, refresh, includeReturns, year);
+    return result.data;
   },
 
   // Get order by ID or order number (supports SAGE)

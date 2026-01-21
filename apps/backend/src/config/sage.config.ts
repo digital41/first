@@ -20,6 +20,8 @@ export interface SageConfig {
   // Cache
   cacheEnabled: boolean;
   cacheTTLMinutes: number;
+  // Période de synchronisation
+  syncPeriodMonths: number; // Nombre de mois à synchroniser (défaut: 12 = 1 an)
 }
 
 // Configuration par défaut (désactivé)
@@ -45,6 +47,9 @@ export const sageConfig: SageConfig = {
   // Cache local pour réduire les requêtes SAGE
   cacheEnabled: process.env.SAGE_CACHE_ENABLED !== 'false', // Activé par défaut
   cacheTTLMinutes: parseInt(process.env.SAGE_CACHE_TTL || '30', 10), // 30 minutes par défaut
+
+  // Période de synchronisation (12 mois = 1 an par défaut)
+  syncPeriodMonths: parseInt(process.env.SAGE_SYNC_PERIOD_MONTHS || '12', 10),
 };
 
 // Tables SAGE 100 (lecture seule)
@@ -59,12 +64,16 @@ export const SAGE_TABLES = {
   // Articles
   ARTICLE: 'F_ARTICLE',
 
-  // Types de documents
+  // Types de documents SAGE (DO_Type)
   DOC_TYPES: {
-    BC: 1,   // Bon de commande (devis - exclu de "mes commandes")
-    BP: 2,   // Bon de préparation (PL)
-    BL: 3,   // Bon de livraison
-    FA: 6,   // Facture
+    DEVIS: 0,    // Devis
+    BC: 1,       // Bon de commande
+    BP: 2,       // Bon de préparation / Préparation de livraison
+    BL: 3,       // Bon de livraison
+    BR: 4,       // Bon de retour (retour client)
+    AVOIR: 5,    // Bon d'avoir (avoir financier)
+    FA: 6,       // Facture
+    FA_ARCH: 7,  // Facture comptabilisée/archivée
   },
 } as const;
 

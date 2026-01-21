@@ -392,3 +392,17 @@ export async function updateProfile(
   const { passwordHash: _, ...safeUser } = updatedUser;
   return safeUser;
 }
+
+/**
+ * Récupère un utilisateur par son ID (sans le mot de passe)
+ */
+export async function getUserById(userId: string): Promise<SafeUser | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) return null;
+
+  const { passwordHash: _, ...safeUser } = user;
+  return safeUser;
+}

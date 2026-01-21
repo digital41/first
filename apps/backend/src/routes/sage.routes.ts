@@ -85,12 +85,29 @@ router.get('/customer/:code', (async (req: Request, res: Response): Promise<void
 router.get('/customer/:code/orders', (async (req: Request, res: Response): Promise<void> => {
   try {
     const code = req.params.code as string;
-    const orders = await SageService.getCustomerOrders(code);
+    const forceRefresh = req.query.refresh === 'true';
+
+    console.log(`[SAGE Route] /customer/${code}/orders - forceRefresh=${forceRefresh}`);
+
+    const orders = await SageService.getCustomerOrders(code, forceRefresh);
+
+    // Calcul des statistiques par année pour le debug
+    const yearCounts: Record<number, number> = {};
+    orders.forEach((o) => {
+      const year = new Date(o.orderDate).getFullYear();
+      yearCounts[year] = (yearCounts[year] || 0) + 1;
+    });
 
     res.json({
       success: true,
       data: orders,
       count: orders.length,
+      debug: {
+        forceRefresh,
+        yearCounts,
+        cacheStats: SageService.getCacheStats(),
+        syncPeriodMonths: sageConfig.syncPeriodMonths,
+      },
     });
   } catch {
     res.json({

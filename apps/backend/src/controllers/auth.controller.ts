@@ -104,13 +104,21 @@ export async function logout(
 
 /**
  * GET /api/auth/me
- * Retourne les infos de l'utilisateur connecté
+ * Retourne les infos de l'utilisateur connecté (depuis la base de données)
  */
 export async function me(
   req: AuthenticatedRequest,
   res: Response
 ): Promise<void> {
-  sendSuccess(res, { user: req.user });
+  // Récupérer l'utilisateur complet depuis la base de données
+  const fullUser = await authService.getUserById(req.user.id);
+
+  if (!fullUser) {
+    res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+    return;
+  }
+
+  sendSuccess(res, { user: fullUser });
 }
 
 /**

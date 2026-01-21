@@ -262,14 +262,16 @@ export async function listTickets(
 
   const where: Record<string, unknown> = {};
 
-  // Exclure les tickets résolus par défaut pour tous (sauf si filtre explicite)
-  // Cela s'applique aux clients ET aux admins/agents
+  // Filtrage par statut
+  // Si un statut est spécifié, on filtre par ce statut
+  // Sinon, pour les clients on exclut RESOLVED/CLOSED, pour les admins on montre tout
   if (status) {
     where.status = status;
-  } else {
-    // Par défaut: ne pas montrer les tickets RESOLVED
-    where.status = { not: 'RESOLVED' };
+  } else if (customerId) {
+    // Pour les clients: exclure les tickets résolus/fermés par défaut
+    where.status = { notIn: ['RESOLVED', 'CLOSED'] };
   }
+  // Pour les admins/agents: pas de filtre par défaut, on montre tous les tickets
 
   if (issueType) where.issueType = issueType;
   if (priority) where.priority = priority;

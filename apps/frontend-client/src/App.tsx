@@ -13,6 +13,7 @@ import {
   TicketDetailPage,
   OrdersListPage,
   OrderDetailPage,
+  OrderTicketPage,
   FAQPage,
   KnowledgeBasePage,
   ContactPage,
@@ -145,6 +146,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <MainLayout>
               <OrderDetailPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/orders/:orderNumber/ticket"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <OrderTicketPage />
             </MainLayout>
           </ProtectedRoute>
         }

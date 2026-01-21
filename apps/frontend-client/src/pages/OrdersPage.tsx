@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -7,7 +7,6 @@ import {
   MapPin,
   CreditCard,
   Truck,
-  CheckCircle,
   Clock,
   AlertCircle,
   PlusCircle,
@@ -16,7 +15,9 @@ import {
   Receipt,
   ShoppingCart,
   Download,
-  Loader2
+  Loader2,
+  RefreshCw,
+  RotateCcw
 } from 'lucide-react';
 import { ordersApi } from '@/services/api';
 import { Order } from '@/types';
@@ -25,41 +26,194 @@ import { formatDate, formatDateTime, cn } from '@/utils/helpers';
 
 // Labels de statut SAGE
 const SAGE_STATUS_LABELS: Record<string, string> = {
+  'DEVIS': 'Devis',
   'EN_COURS': 'En cours',
   'EN_PREPARATION': 'En préparation',
   'LIVREE': 'Livrée',
   'FACTUREE': 'Facturée',
+  'RETOUR': 'Retour',
+  'AVOIR': 'Avoir',
   'INCONNU': 'Inconnu',
 };
 
-// Types de documents SAGE (BC type 1 exclu car ce sont des devis)
+// Types de documents SAGE
 const DOC_TYPE_LABELS: Record<number, string> = {
+  0: 'Devis',
   1: 'Bon de Commande',
-  2: 'Bon de Préparation',  // PL
-  3: 'Livraison',
+  2: 'Bon de Préparation',
+  3: 'Bon de Livraison',
+  4: 'Bon de Retour',
+  5: 'Avoir',
   6: 'Facture',
+  7: 'Facture',
 };
+
+/**
+ * Vérifie si une date est valide (pas la date NULL de SAGE 1753-01-01)
+ */
+const isValidSageDate = (dateStr?: string): boolean => {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  // Vérifier si la date est valide et n'est pas la date NULL de SAGE (1753)
+  return !isNaN(date.getTime()) && date.getFullYear() > 1753;
+};
+
+/**
+ * Retourne la date de livraison appropriée selon le type de document SAGE
+ * - BC (docType=1): Bon de commande → date de livraison prévue
+ * - PL (docType=2): Commande en préparation → date de livraison prévue
+ * - BL (docType=3): Commande livrée → date création BL = date livraison
+ * - BR (docType=4): Bon de retour → date du retour
+ * - AVOIR (docType=5): Avoir → date de l'avoir
+ * - FA (docType=6/7): Facture → date de facturation
+ */
+const getDeliveryDateInfo = (order: Order): { date: string | null; label: string } => {
+  const docType = order.docType || 0;
+
+  // Pour BL (type 3) : La date du BL est la date de livraison effective
+  if (docType === 3) {
+    if (isValidSageDate(order.orderDate)) {
+      return { date: order.orderDate!, label: 'Livré le' };
+    }
+    if (isValidSageDate(order.createdAt)) {
+      return { date: order.createdAt!, label: 'Livré le' };
+    }
+  }
+
+  // Pour PL/BP (type 2) : En préparation, la date de commande est la date prévue
+  if (docType === 2) {
+    if (isValidSageDate(order.deliveryDate)) {
+      return { date: order.deliveryDate!, label: 'Livraison prévue le' };
+    }
+    if (isValidSageDate(order.orderDate)) {
+      return { date: order.orderDate!, label: 'Livraison prévue le' };
+    }
+  }
+
+  // Pour BR (type 4) : Bon de retour
+  if (docType === 4) {
+    if (isValidSageDate(order.orderDate)) {
+      return { date: order.orderDate!, label: 'Retour du' };
+    }
+  }
+
+  // Pour AVOIR (type 5) : Avoir financier
+  if (docType === 5) {
+    if (isValidSageDate(order.orderDate)) {
+      return { date: order.orderDate!, label: 'Avoir du' };
+    }
+  }
+
+  // Pour FA (type 6 ou 7) : Facture
+  if (docType === 6 || docType === 7) {
+    if (isValidSageDate(order.orderDate)) {
+      return { date: order.orderDate!, label: 'Facturé le' };
+    }
+  }
+
+  // Pour BC (type 1) ou autres : Utiliser deliveryDate si valide
+  if (isValidSageDate(order.deliveryDate)) {
+    return { date: order.deliveryDate!, label: 'Livraison prévue le' };
+  }
+
+  // Fallback: pas de date valide
+  return { date: null, label: '' };
+};
+
+// Nombre de commandes par page (pagination infinie)
+const ORDERS_PER_PAGE = 5;
 
 // Orders List Page
 export function OrdersListPage() {
+  const currentYear = new Date().getFullYear();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showReturns, setShowReturns] = useState(false); // Afficher retours/avoirs
+  const [selectedYear, setSelectedYear] = useState(currentYear); // Année sélectionnée
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const response = await ordersApi.getAll();
-        setOrders(response || []);
-      } catch (error) {
-        console.error('Error fetching orders:', error);
-        setOrders([]);
-      } finally {
-        setIsLoading(false);
+  // Années disponibles (année courante et année précédente)
+  const availableYears = [currentYear, currentYear - 1];
+
+  const [totalOrders, setTotalOrders] = useState(0);
+
+  // Fonction pour charger les commandes (première page ou refresh)
+  const fetchOrders = useCallback(async (forceRefresh = false, includeReturns = false, year?: number) => {
+    try {
+      if (forceRefresh) {
+        setIsRefreshing(true);
       }
-    };
-
-    fetchOrders();
+      const response = await ordersApi.getAllPaginated(1, ORDERS_PER_PAGE, forceRefresh, includeReturns, year);
+      setOrders(response.data || []);
+      setTotalOrders(response.meta.total);
+      setCurrentPage(1);
+      // Il y a plus de commandes si la page actuelle * limit < total
+      setHasMore(response.data.length > 0 && response.data.length < response.meta.total);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setOrders([]);
+      setTotalOrders(0);
+      setHasMore(false);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, []);
+
+  // Charger plus de commandes (pagination infinie)
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const response = await ordersApi.getAllPaginated(nextPage, ORDERS_PER_PAGE, false, showReturns, selectedYear);
+      if (response.data && response.data.length > 0) {
+        setOrders(prev => [...prev, ...response.data]);
+        setCurrentPage(nextPage);
+        // Vérifier s'il reste des commandes à charger
+        const loadedCount = orders.length + response.data.length;
+        setHasMore(loadedCount < response.meta.total);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading more orders:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentPage, hasMore, isLoadingMore, showReturns, selectedYear, orders.length]);
+
+  // Chargement initial et quand l'année change
+  useEffect(() => {
+    setIsLoading(true);
+    setOrders([]);
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchOrders(false, showReturns, selectedYear);
+  }, [fetchOrders, showReturns, selectedYear]);
+
+  // Rafraîchir les données depuis SAGE
+  const handleRefresh = () => {
+    setOrders([]);
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchOrders(true, showReturns, selectedYear);
+  };
+
+  // Toggle retours/avoirs
+  const handleToggleReturns = () => {
+    const newValue = !showReturns;
+    setShowReturns(newValue);
+  };
+
+  // Changer d'année
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+  };
 
   const getStatusIcon = (status: string) => {
     const normalizedStatus = status.toUpperCase();
@@ -78,6 +232,12 @@ export function OrdersListPage() {
       case 'PROCESSING':
       case 'EN TRAITEMENT':
         return <Clock className="text-yellow-500" size={18} />;
+      case 'RETOUR':
+        return <ArrowLeft className="text-purple-500" size={18} />;
+      case 'AVOIR':
+        return <CreditCard className="text-indigo-500" size={18} />;
+      case 'DEVIS':
+        return <FileText className="text-gray-500" size={18} />;
       case 'CANCELLED':
       case 'ANNULÉE':
         return <AlertCircle className="text-red-500" size={18} />;
@@ -101,6 +261,12 @@ export function OrdersListPage() {
       case 'PROCESSING':
       case 'EN TRAITEMENT':
         return 'bg-yellow-100 text-yellow-800';
+      case 'RETOUR':
+        return 'bg-purple-100 text-purple-800';
+      case 'AVOIR':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'DEVIS':
+        return 'bg-gray-100 text-gray-600';
       case 'CANCELLED':
       case 'ANNULÉE':
         return 'bg-red-100 text-red-800';
@@ -120,11 +286,58 @@ export function OrdersListPage() {
   return (
     <div className="space-y-6 fade-in">
       {/* Header */}
-      <div>
-        <h1 className="page-title">Mes commandes</h1>
-        <p className="page-subtitle">
-          Consultez l'historique de vos commandes et leur statut de livraison.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="page-title">Mes commandes</h1>
+          <p className="page-subtitle">
+            Consultez l'historique de vos commandes et leur statut de livraison.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 self-start">
+          {/* Sélecteur d'année */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            {availableYears.map((year) => (
+              <button
+                key={year}
+                onClick={() => handleYearChange(year)}
+                className={cn(
+                  'px-3 py-2 text-sm font-medium transition-colors',
+                  selectedYear === year
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                )}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+
+          {/* Toggle Retours/Avoirs */}
+          <button
+            onClick={handleToggleReturns}
+            className={cn(
+              'flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+              showReturns
+                ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+            )}
+            title={showReturns ? 'Masquer les retours et avoirs' : 'Afficher les retours et avoirs'}
+          >
+            <RotateCcw size={16} />
+            <span className="hidden sm:inline">Retours/Avoirs</span>
+          </button>
+
+          {/* Bouton Actualiser */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="btn-outline flex items-center justify-center gap-2"
+            title="Actualiser les données depuis SAGE"
+          >
+            <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">{isRefreshing ? 'Actualisation...' : 'Actualiser'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Orders list */}
@@ -165,7 +378,11 @@ export function OrdersListPage() {
                         </p>
                       )}
                       <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                        {order.orderDate ? `Commandé le ${formatDate(order.orderDate)}` : 'Date non disponible'}
+                        {order.createdAt
+                          ? `Créé le ${formatDateTime(order.createdAt)}`
+                          : order.orderDate
+                            ? `Date: ${formatDate(order.orderDate)}`
+                            : 'Date non disponible'}
                       </p>
                       {order.companyName && (
                         <p className="text-xs sm:text-sm text-gray-600 truncate">{order.companyName}</p>
@@ -207,6 +424,38 @@ export function OrdersListPage() {
               </div>
             </Link>
           ))}
+
+          {/* Bouton "Voir plus" pour pagination infinie */}
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <button
+                onClick={loadMore}
+                disabled={isLoadingMore}
+                className="btn-outline flex items-center justify-center gap-2 px-6 py-3"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Chargement...
+                  </>
+                ) : (
+                  <>
+                    <Package size={18} />
+                    Voir plus de commandes
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Message fin de liste */}
+          {!hasMore && orders.length > 0 && (
+            <p className="text-center text-sm text-gray-500 pt-4">
+              {orders.length === totalOrders
+                ? `Toutes les commandes ont été chargées (${totalOrders} au total)`
+                : `${orders.length} commandes affichées sur ${totalOrders}`}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -311,7 +560,11 @@ export function OrderDetailPage() {
               </p>
             )}
             <p className="page-subtitle">
-              {order.orderDate ? `Commandé le ${formatDateTime(order.orderDate)}` : 'Date non disponible'}
+              {order.createdAt
+                ? `Créé le ${formatDateTime(order.createdAt)}`
+                : order.orderDate
+                  ? `Date: ${formatDate(order.orderDate)}`
+                  : 'Date non disponible'}
             </p>
             {order.companyName && (
               <p className="text-gray-600 mt-1 break-words">{order.companyName}</p>
@@ -334,7 +587,7 @@ export function OrderDetailPage() {
 
             {/* Bouton signaler problème */}
             <Link
-              to={`/tickets/new?orderNumber=${order.orderNumber}`}
+              to={`/orders/${order.orderNumber}/ticket`}
               className="btn-primary flex items-center justify-center w-full sm:w-auto"
             >
               <PlusCircle size={18} className="mr-2" />
@@ -367,6 +620,22 @@ export function OrderDetailPage() {
               const isCompleted = index <= currentStep;
               const isCurrent = index === currentStep;
 
+              // Déterminer la date de transformation pour chaque étape
+              // - Préparation: bpDate (date du BP) ou createdAt si c'est un BP (docType=2)
+              // - Livrée: blDate (date du BL) ou createdAt si c'est un BL (docType=3)
+              // - Facturée: faDate (date de la FA) ou createdAt si c'est une FA (docType=6,7)
+              let stepDate: string | undefined;
+              if (index === 0) {
+                // Préparation: utiliser bpDate ou createdAt si docType=2
+                stepDate = order.bpDate || (order.docType === 2 ? order.createdAt : undefined);
+              } else if (index === 1) {
+                // Livrée: utiliser blDate ou createdAt si docType=3
+                stepDate = order.blDate || (order.docType === 3 ? order.createdAt : undefined);
+              } else if (index === 2) {
+                // Facturée: utiliser faDate ou createdAt si docType=6 ou 7
+                stepDate = order.faDate || ((order.docType === 6 || order.docType === 7) ? order.createdAt : undefined);
+              }
+
               return (
                 <div key={step.label} className="flex flex-col items-center">
                   <div
@@ -389,18 +658,30 @@ export function OrderDetailPage() {
                     <span className="sm:hidden">{step.shortLabel}</span>
                     <span className="hidden sm:inline">{step.label}</span>
                   </span>
+                  {/* Date de transformation pour cette étape */}
+                  {stepDate && isCompleted && (
+                    <span className="mt-1 text-[10px] sm:text-xs text-gray-500 text-center max-w-[80px] sm:max-w-none">
+                      {formatDateTime(stepDate)}
+                    </span>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {order.deliveryDate && (
-          <p className="mt-4 sm:mt-6 text-center text-sm sm:text-base text-gray-600">
-            <Calendar className="inline mr-1" size={16} />
-            Livraison prévue le {formatDate(order.deliveryDate)}
-          </p>
-        )}
+        {(() => {
+          const deliveryInfo = getDeliveryDateInfo(order);
+          if (deliveryInfo.date) {
+            return (
+              <p className="mt-4 sm:mt-6 text-center text-sm sm:text-base text-gray-600">
+                <Calendar className="inline mr-1" size={16} />
+                {deliveryInfo.label} {formatDate(deliveryInfo.date)}
+              </p>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">

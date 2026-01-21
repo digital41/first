@@ -91,18 +91,18 @@ function NotificationItem({ notification, onMarkRead, onClick }: NotificationIte
       to={getLink()}
       onClick={handleClick}
       className={cn(
-        'flex items-start p-4 hover:bg-gray-50 transition-colors border-l-4',
+        'flex items-start p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-4',
         notification.isRead
           ? 'border-transparent bg-white'
           : 'border-primary-500 bg-primary-50'
       )}
     >
-      <div className="shrink-0 mr-3 mt-0.5">{getIcon()}</div>
+      <div className="shrink-0 mr-2 sm:mr-3 mt-0.5">{getIcon()}</div>
       <div className="flex-1 min-w-0">
-        <p className={cn('text-sm font-medium', notification.isRead ? 'text-gray-700' : 'text-gray-900')}>
+        <p className={cn('text-sm font-medium line-clamp-1', notification.isRead ? 'text-gray-700' : 'text-gray-900')}>
           {getTitle()}
         </p>
-        <p className={cn('text-sm mt-0.5', notification.isRead ? 'text-gray-500' : 'text-gray-600')}>
+        <p className={cn('text-xs sm:text-sm mt-0.5 line-clamp-2', notification.isRead ? 'text-gray-500' : 'text-gray-600')}>
           {getMessage()}
         </p>
         {notification.ticket && (
@@ -136,31 +136,31 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div className="fixed top-16 right-4 w-96 max-h-[calc(100vh-5rem)] bg-white rounded-xl shadow-xl border border-gray-200 z-50 flex flex-col slide-in-right">
+      {/* Panel - Responsive: full width on mobile, fixed width on desktop */}
+      <div className="fixed top-14 sm:top-16 left-2 right-2 sm:left-auto sm:right-4 sm:w-96 max-h-[calc(100vh-4rem)] sm:max-h-[calc(100vh-5rem)] bg-white rounded-xl shadow-xl border border-gray-200 z-50 flex flex-col slide-in-right">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center">
-            <Bell className="text-gray-500 mr-2" size={18} />
-            <h2 className="font-semibold text-gray-900">Notifications</h2>
+        <div className="px-3 sm:px-4 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center min-w-0">
+            <Bell className="text-gray-500 mr-2 shrink-0" size={18} />
+            <h2 className="font-semibold text-gray-900 truncate">Notifications</h2>
             {unreadCount > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-primary-100 text-primary-700 text-xs font-medium rounded-full">
+              <span className="ml-2 px-2 py-0.5 bg-primary-100 text-primary-700 text-xs font-medium rounded-full shrink-0">
                 {unreadCount}
               </span>
             )}
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center shrink-0 ml-2">
             {unreadCount > 0 && (
               <button
                 onClick={() => markAllAsRead()}
-                className="text-sm text-primary-600 hover:text-primary-700 mr-2"
+                className="text-xs sm:text-sm text-primary-600 hover:text-primary-700 mr-2 whitespace-nowrap"
               >
-                Tout marquer lu
+                Tout lu
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X size={18} />
             </button>
@@ -168,17 +168,17 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           {isLoading ? (
-            <div className="p-8 text-center">
+            <div className="p-6 sm:p-8 text-center">
               <div className="w-8 h-8 border-2 border-gray-200 border-t-primary-600 rounded-full animate-spin mx-auto" />
               <p className="text-sm text-gray-500 mt-2">Chargement...</p>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="p-8 text-center">
-              <Bell className="mx-auto text-gray-300 mb-3" size={40} />
-              <p className="text-gray-500">Aucune notification</p>
-              <p className="text-sm text-gray-400 mt-1">
+            <div className="p-6 sm:p-8 text-center">
+              <Bell className="mx-auto text-gray-300 mb-3" size={36} />
+              <p className="text-gray-500 text-sm sm:text-base">Aucune notification</p>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1">
                 Vous serez notifié des mises à jour de vos tickets
               </p>
             </div>
@@ -202,11 +202,11 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
 
         {/* Footer */}
         {notifications.length > 0 && (
-          <div className="px-4 py-3 border-t border-gray-200 shrink-0">
+          <div className="px-3 sm:px-4 py-3 border-t border-gray-200 shrink-0 bg-gray-50">
             <Link
               to="/notifications"
               onClick={onClose}
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium block text-center sm:text-left"
             >
               Voir toutes les notifications
             </Link>

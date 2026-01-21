@@ -17,6 +17,10 @@
     "db:reset": "prisma migrate reset && tsx prisma/seed.ts",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
     "postinstall": "prisma generate"
   },
   "prisma": {
@@ -49,9 +53,14 @@
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.5",
     "@types/pdfkit": "^0.17.4",
+    "@vitest/coverage-v8": "^2.1.0",
+    "@vitest/ui": "^2.1.0",
     "prisma": "^5.22.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0"
   },
   "engines": {
     "node": ">=18.0.0"

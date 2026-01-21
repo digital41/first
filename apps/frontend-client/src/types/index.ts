@@ -84,8 +84,12 @@ export interface Order {
   shippingAddress?: string;
   items?: OrderItem[];      // Lignes de commande (SageOrderLine[])
   lines?: OrderLine[];      // Lignes depuis SAGE
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: string;       // cbCreation - Date/heure de création
+  updatedAt?: string;       // cbModification - Date/heure de modification
+  // Dates de transformation (historique du document)
+  bpDate?: string;          // Date de création du BP lié (préparation)
+  blDate?: string;          // Date de création du BL lié (livraison)
+  faDate?: string;          // Date de création de la Facture liée
 }
 
 export interface OrderItem {

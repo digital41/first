@@ -5,6 +5,7 @@ export { TicketsListPage } from './TicketsListPage';
 export { CreateTicketPage } from './CreateTicketPage';
 export { TicketDetailPage } from './TicketDetailPage';
 export { OrdersListPage, OrderDetailPage } from './OrdersPage';
+export { OrderTicketPage } from './OrderTicketPage';
 export { FAQPage } from './FAQPage';
 export { KnowledgeBasePage } from './KnowledgeBasePage';
 export { ContactPage } from './ContactPage';
