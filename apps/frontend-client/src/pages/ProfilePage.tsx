@@ -108,26 +108,25 @@ export function ProfilePage() {
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Profile Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 h-24" />
-        <div className="px-4 sm:px-6 pb-6">
-          <div className="flex flex-col sm:flex-row sm:items-end -mt-12 gap-4">
+        <div className="px-4 sm:px-6 py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             {/* Avatar */}
-            <div className="w-24 h-24 rounded-2xl bg-white shadow-lg flex items-center justify-center border-4 border-white flex-shrink-0">
+            <div className="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center border border-gray-200 flex-shrink-0">
               {user.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
                   alt={user.displayName}
-                  className="w-full h-full rounded-xl object-cover"
+                  className="w-full h-full rounded-2xl object-cover"
                 />
               ) : (
-                <span className="text-2xl font-bold text-primary-600">
+                <span className="text-xl font-bold text-primary-600">
                   {getInitials(user.displayName)}
                 </span>
               )}
             </div>
 
             {/* User Info */}
-            <div className="flex-1 sm:mb-1 min-w-0">
+            <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{user.displayName}</h1>
               <p className="text-sm text-gray-500">Client depuis {formatDate(user.createdAt)}</p>
             </div>

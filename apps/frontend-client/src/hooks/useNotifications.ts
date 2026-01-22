@@ -36,9 +36,16 @@ export function useNotifications(): UseNotificationsReturn {
         notificationsApi.getAll(),
         notificationsApi.getUnreadCount(),
       ]);
+      // Dédupliquer les notifications par ID
+      const uniqueNotifs = notifs.reduce((acc: Notification[], n: Notification) => {
+        if (!acc.some(existing => existing.id === n.id)) {
+          acc.push(n);
+        }
+        return acc;
+      }, []);
       // Mettre à jour les IDs connus
-      seenIdsRef.current = new Set(notifs.map((n: Notification) => n.id));
-      setNotifications(notifs);
+      seenIdsRef.current = new Set(uniqueNotifs.map((n: Notification) => n.id));
+      setNotifications(uniqueNotifs);
       setUnreadCount(count);
     } catch (err) {
       setError('Erreur lors du chargement des notifications');
@@ -80,7 +87,13 @@ export function useNotifications(): UseNotificationsReturn {
         createdAt: incoming.createdAt as string || new Date().toISOString(),
       };
 
-      setNotifications((prev) => [notif, ...prev]);
+      setNotifications((prev) => {
+        // Double-vérification pour éviter les doublons
+        if (prev.some(n => n.id === notifId)) {
+          return prev;
+        }
+        return [notif, ...prev];
+      });
       setUnreadCount((count) => count + 1);
     };
 
