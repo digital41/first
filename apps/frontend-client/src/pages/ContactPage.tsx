@@ -83,7 +83,7 @@ export function ContactPage() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Téléphone</h3>
-                <p className="text-gray-600 mt-1">+33 1 23 45 67 89</p>
+                <p className="text-gray-600 mt-1">01 41 32 39 45</p>
                 <p className="text-sm text-gray-500 mt-1">
                   Service client disponible du lundi au vendredi
                 </p>
@@ -96,7 +96,7 @@ export function ContactPage() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Email</h3>
-                <p className="text-gray-600 mt-1">support@kly-groupe.com</p>
+                <p className="text-gray-600 mt-1">assistance@klygroupe.com</p>
                 <p className="text-sm text-gray-500 mt-1">
                   Réponse sous 24h ouvrées
                 </p>
@@ -110,9 +110,9 @@ export function ContactPage() {
               <div>
                 <h3 className="font-semibold text-gray-900">Adresse</h3>
                 <p className="text-gray-600 mt-1">
-                  KLY Groupe<br />
-                  123 Avenue de l'Industrie<br />
-                  75001 Paris, France
+                  Kly Groupe<br />
+                  14 Rue des Noëls<br />
+                  92230 Gennevilliers
                 </p>
               </div>
             </div>
@@ -126,21 +126,25 @@ export function ContactPage() {
             </div>
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Lundi - Vendredi</span>
-                <span className="font-medium text-gray-900">9h00 - 18h00</span>
+                <span className="text-gray-600">Lundi - Jeudi</span>
+                <span className="font-medium text-gray-900">08h30 - 18h00</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Vendredi</span>
+                <span className="font-medium text-gray-900">08h30 - 17h00</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Samedi</span>
-                <span className="font-medium text-gray-900">9h00 - 12h00</span>
+                <span className="text-gray-500">Fermé</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Dimanche</span>
-                <span className="text-gray-500">Fermé</span>
+                <span className="text-gray-500">SAV Fermé</span>
               </div>
               <div className="pt-3 border-t border-gray-200">
                 <p className="text-sm text-gray-500">
                   <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                  Support d'urgence 24/7 pour les clients premium
+                  Support d'urgence disponible 24/7 avec Lumo AI
                 </p>
               </div>
             </div>
@@ -179,7 +183,7 @@ export function ContactPage() {
               Pour toute urgence nécessitant une intervention immédiate, appelez notre ligne d'urgence disponible 24/7 :
             </p>
             <p className="text-xl font-bold text-orange-900 mt-2">
-              +33 1 23 45 67 00
+              01 41 32 39 45
             </p>
           </div>
         </div>

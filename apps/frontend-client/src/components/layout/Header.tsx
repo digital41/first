@@ -79,22 +79,22 @@ export function Header({ onMenuToggle, isMobileMenuOpen }: HeaderProps) {
 
               {/* Notifications dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                  <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Notifications</h3>
+                <div className="fixed sm:absolute inset-x-2 sm:inset-x-auto top-14 sm:top-auto sm:right-0 sm:mt-2 w-auto sm:w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <div className="px-3 sm:px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
                     {unreadCount > 0 && (
                       <button
                         onClick={() => markAllAsRead()}
-                        className="text-sm text-primary-600 hover:text-primary-700"
+                        className="text-xs sm:text-sm text-primary-600 hover:text-primary-700"
                       >
-                        Tout marquer lu
+                        Tout lu
                       </button>
                     )}
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
+                  <div className="max-h-[60vh] sm:max-h-96 overflow-y-auto">
                     {recentNotifications.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-gray-500">
-                        Aucune notification
+                      <div className="px-4 py-6 sm:py-8 text-center text-gray-500">
+                        <p className="text-sm">Aucune notification</p>
                       </div>
                     ) : (
                       recentNotifications.map((notification) => (
@@ -102,13 +102,13 @@ export function Header({ onMenuToggle, isMobileMenuOpen }: HeaderProps) {
                           key={notification.id}
                           onClick={() => !notification.isRead && markAsRead([notification.id])}
                           className={cn(
-                            'px-4 py-3 hover:bg-gray-50 cursor-pointer border-l-4',
+                            'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-gray-50 cursor-pointer border-l-4',
                             notification.isRead
                               ? 'border-transparent'
                               : 'border-primary-500 bg-primary-50'
                           )}
                         >
-                          <p className="text-sm text-gray-900">
+                          <p className="text-sm text-gray-900 line-clamp-2">
                             {notification.type === 'MESSAGE' && 'Nouveau message sur votre ticket'}
                             {notification.type === 'TICKET_UPDATE' && 'Votre ticket a été mis à jour'}
                             {notification.type === 'SLA_WARNING' && 'Attention: délai de réponse bientôt dépassé'}
