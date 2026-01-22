@@ -13,7 +13,10 @@ import {
   FileText,
   Download,
   X,
-  History
+  History,
+  ChevronDown,
+  ChevronUp,
+  Database
 } from 'lucide-react';
 import { ticketsApi, messagesApi, uploadApi } from '@/services/api';
 import { socketService } from '@/services/socket';
@@ -50,6 +53,7 @@ export function TicketDetailPage() {
   const [showSuccess, setShowSuccess] = useState(location.state?.created);
   const [isAITyping, setIsAITyping] = useState(false);
   const [showHumanHelpButton, setShowHumanHelpButton] = useState(false);
+  const [showSageContext, setShowSageContext] = useState(false);
 
   // Fetch ticket and messages
   useEffect(() => {
@@ -368,7 +372,40 @@ export function TicketDetailPage() {
                 </div>
                 <span className="text-xs text-gray-500">{formatDateTime(ticket.createdAt)}</span>
               </div>
-              <p className="text-gray-700 whitespace-pre-wrap">{ticket.description}</p>
+              {(() => {
+                // Séparer la description principale du contexte Sage (après ---)
+                const parts = ticket.description.split(/\n---\n/);
+                const mainDescription = parts[0];
+                const sageContext = parts.length > 1 ? parts.slice(1).join('\n---\n') : null;
+
+                return (
+                  <>
+                    <p className="text-gray-700 whitespace-pre-wrap">{mainDescription}</p>
+
+                    {sageContext && (
+                      <div className="mt-3 border-t pt-3">
+                        <button
+                          onClick={() => setShowSageContext(!showSageContext)}
+                          className="flex items-center text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          <Database size={12} className="mr-1.5" />
+                          <span>Contexte Sage</span>
+                          {showSageContext ? (
+                            <ChevronUp size={14} className="ml-1" />
+                          ) : (
+                            <ChevronDown size={14} className="ml-1" />
+                          )}
+                        </button>
+                        {showSageContext && (
+                          <div className="mt-2 p-3 bg-gray-100 rounded-lg text-xs text-gray-600 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                            {sageContext}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {ticket.attachments && ticket.attachments.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {ticket.attachments.map((attachment) => (
