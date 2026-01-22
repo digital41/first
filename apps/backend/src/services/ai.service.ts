@@ -1,23 +1,26 @@
 // ============================================
-// SERVICE IA - Réponses automatiques avec OpenAI GPT
+// SERVICE IA - Réponses automatiques avec Google Gemini Flash
 // ============================================
 
 import { PrismaClient, IssueType, TicketPriority, TicketStatus, Prisma } from '@prisma/client';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 const prisma = new PrismaClient();
 
-// Type pour la réponse OpenAI
-interface OpenAIResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
-}
+// Configuration API Google Gemini
+const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY || '';
+const GEMINI_MODEL = 'gemini-2.5-flash'; // Gemini 2.5 Flash (Stable/Production)
 
-// Configuration API OpenAI
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+// Initialiser le client Gemini
+const genAI = GOOGLE_AI_API_KEY ? new GoogleGenerativeAI(GOOGLE_AI_API_KEY) : null;
+
+// Configuration de sécurité pour Gemini
+const safetySettings = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+];
 
 interface TicketContext {
   ticketId: string;
@@ -55,32 +58,67 @@ interface ExtractedEquipmentInfo {
   errorCode?: string;
 }
 
-// Prompt système pour l'IA SAV
-const SYSTEM_PROMPT = `Tu es l'assistant IA du service après-vente (SAV) de KLY GROUPE, une entreprise industrielle française.
+// Prompt système pour l'IA SAV - LUMO
+const SYSTEM_PROMPT = `Tu es LUMO, l'assistant intelligent du service après-vente de KLY GROUPE, leader français dans la distribution d'équipements industriels et professionnels.
 
-CONTEXTE:
-- Tu réponds aux demandes clients de manière professionnelle et efficace
-- Tu dois essayer de résoudre les problèmes simples sans intervention humaine
-- Tu dois collecter les informations nécessaires pour les problèmes complexes
-- Tu dois être empathique et rassurant
+🎯 TA MISSION:
+Tu es le premier point de contact des clients. Ton objectif est de résoudre rapidement leurs problèmes ou de collecter les informations nécessaires pour qu'un technicien puisse intervenir efficacement.
 
-RÈGLES IMPORTANTES:
-1. Réponds TOUJOURS en français
-2. Sois CONCIS (max 100 mots, 3-4 phrases)
-3. Utilise un ton professionnel mais chaleureux
-4. Si tu ne peux pas résoudre le problème, indique clairement que tu transfères à un agent
-5. Propose des solutions concrètes quand possible
-6. Pose UNE seule question si besoin de précision
+👤 TA PERSONNALITÉ:
+- Professionnel mais chaleureux et accessible
+- Empathique : tu comprends la frustration d'un client avec un équipement en panne
+- Proactif : tu anticipes les besoins et proposes des solutions
+- Rassurant : tu montres que le problème sera pris en charge
 
-TYPES DE PROBLÈMES:
-- TECHNICAL: Problèmes techniques sur équipements/machines
-- DELIVERY: Questions sur livraisons et commandes
-- BILLING: Facturation, paiements, avoirs
-- OTHER: Autres demandes
+📋 RÈGLES DE CONVERSATION:
+1. Réponds TOUJOURS en français, avec un ton naturel et humain
+2. Sois CONCIS : 2-4 phrases maximum (80-120 mots)
+3. JAMAIS de markdown, balises HTML ou formatage spécial
+4. UNE seule question par message pour ne pas submerger le client
+5. Utilise le prénom du client quand disponible
+6. Termine toujours par une question ou une action claire
 
-FORMAT DE RÉPONSE:
-Réponds directement au client sans utiliser de balises ou de formatage spécial.
-Termine par une question ou une action concrète quand approprié.`;
+🔧 STRATÉGIES PAR TYPE DE PROBLÈME:
+
+TECHNIQUE (TECHNICAL):
+- Demande le modèle de l'équipement et le numéro de série
+- Demande le code erreur affiché (si applicable)
+- Propose des solutions de dépannage simples (redémarrage, vérifications basiques)
+- Si le problème persiste après 2 échanges, propose l'intervention d'un technicien
+
+LIVRAISON (DELIVERY):
+- Demande le numéro de commande (format BC-XXXXX)
+- Vérifie l'adresse de livraison si pertinent
+- Rassure sur le suivi et donne des délais réalistes
+
+FACTURATION (BILLING):
+- Demande le numéro de facture concerné
+- Identifie précisément le problème (montant, erreur, avoir demandé)
+- Oriente vers le service comptabilité si nécessaire
+
+AUTRE (OTHER):
+- Identifie d'abord le vrai besoin du client
+- Redirige vers la bonne catégorie si possible
+
+🚨 ESCALADE VERS UN HUMAIN:
+Propose de transférer à un technicien/agent si:
+- Le problème est urgent ou critique (machine à l'arrêt, perte de production)
+- Le client est frustré ou mécontent après 2 échanges
+- Tu n'as pas de solution technique à proposer
+- Le client le demande explicitement
+
+💬 EXEMPLES DE FORMULATIONS:
+- "Je comprends que cette situation soit frustrante..."
+- "Pas de souci, je vais vous aider à résoudre cela."
+- "Pour mieux vous aider, pourriez-vous me préciser..."
+- "Je transfère votre dossier à notre équipe technique qui vous contactera rapidement."
+
+⚠️ À ÉVITER ABSOLUMENT:
+- Les réponses robotiques ou impersonnelles
+- Les listes à puces ou numérotées
+- Les phrases trop longues ou techniques
+- Promettre des délais que tu ne peux pas garantir
+- Répéter les mêmes questions`;
 
 export const AIService = {
   /**
@@ -91,44 +129,34 @@ export const AIService = {
       // Construire le prompt avec le contexte du ticket
       const userPrompt = this.buildUserPrompt(context);
 
-      // Si pas de clé API, utiliser le fallback local
-      if (!OPENAI_API_KEY) {
-        console.log('⚠️ Pas de clé API OpenAI, utilisation du fallback local');
+      // Si pas de clé API ou client non initialisé, utiliser le fallback local
+      if (!GOOGLE_AI_API_KEY || !genAI) {
+        console.log('⚠️ Pas de clé API Gemini, utilisation du fallback local');
         return this.generateLocalResponse(context);
       }
 
-      // Appel à l'API OpenAI
-      const response = await fetch(OPENAI_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini', // Modèle rapide et intelligent
-          max_tokens: 500,
+      // Initialiser le modèle Gemini
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_MODEL,
+        safetySettings,
+        generationConfig: {
           temperature: 0.7,
-          messages: [
-            {
-              role: 'system',
-              content: SYSTEM_PROMPT,
-            },
-            {
-              role: 'user',
-              content: userPrompt,
-            },
-          ],
-        }),
+          maxOutputTokens: 500,
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Erreur API OpenAI:', errorData);
+      // Construire le prompt complet avec le système prompt
+      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}`;
+
+      // Appel à l'API Gemini
+      const result = await model.generateContent(fullPrompt);
+      const response = await result.response;
+      const aiMessage = response.text() || '';
+
+      if (!aiMessage) {
+        console.error('Erreur API Gemini: réponse vide');
         return this.generateLocalResponse(context);
       }
-
-      const data = await response.json() as OpenAIResponse;
-      const aiMessage = data.choices?.[0]?.message?.content || '';
 
       // Analyser si on doit escalader
       const shouldEscalate = this.shouldEscalate(aiMessage, context);
@@ -540,41 +568,33 @@ ${context.description ? `\nDESCRIPTION:\n${context.description}` : ''}`;
     try {
       const operatorPrompt = this.buildOperatorPrompt(context, operatorQuery);
 
-      // Si pas de clé API, utiliser le fallback local
-      if (!OPENAI_API_KEY) {
-        console.log('⚠️ Pas de clé API OpenAI, utilisation du fallback local pour opérateur');
+      // Si pas de clé API ou client non initialisé, utiliser le fallback local
+      if (!GOOGLE_AI_API_KEY || !genAI) {
+        console.log('⚠️ Pas de clé API Gemini, utilisation du fallback local pour opérateur');
         return this.generateLocalOperatorSuggestion(context);
       }
 
-      const response = await fetch(OPENAI_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          max_tokens: 1000,
+      // Initialiser le modèle Gemini
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_MODEL,
+        safetySettings,
+        generationConfig: {
           temperature: 0.5,
-          messages: [
-            {
-              role: 'system',
-              content: OPERATOR_ASSISTANT_PROMPT,
-            },
-            {
-              role: 'user',
-              content: operatorPrompt,
-            },
-          ],
-        }),
+          maxOutputTokens: 1000,
+        },
       });
 
-      if (!response.ok) {
+      // Construire le prompt complet
+      const fullPrompt = `${OPERATOR_ASSISTANT_PROMPT}\n\n---\n\n${operatorPrompt}`;
+
+      // Appel à l'API Gemini
+      const result = await model.generateContent(fullPrompt);
+      const response = await result.response;
+      const aiContent = response.text() || '';
+
+      if (!aiContent) {
         return this.generateLocalOperatorSuggestion(context);
       }
-
-      const data = await response.json() as OpenAIResponse;
-      const aiContent = data.choices?.[0]?.message?.content || '';
 
       // Parser la réponse structurée
       return this.parseOperatorResponse(aiContent, context);
@@ -827,44 +847,36 @@ ${context.description ? `\nDESCRIPTION INITIALE:\n${context.description}` : ''}`
         };
       }
 
-      // Si pas de clé API OpenAI, utiliser le fallback local
-      if (!OPENAI_API_KEY) {
+      // Si pas de clé API Gemini ou client non initialisé, utiliser le fallback local
+      if (!GOOGLE_AI_API_KEY || !genAI) {
         return this.generateLocalConversationSummary(context);
       }
 
       // Construire le prompt pour le résumé
       const summaryPrompt = this.buildSummaryPrompt(context);
 
-      const response = await fetch(OPENAI_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          max_tokens: 800,
+      // Initialiser le modèle Gemini
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_MODEL,
+        safetySettings,
+        generationConfig: {
           temperature: 0.3,
-          messages: [
-            {
-              role: 'system',
-              content: CONVERSATION_SUMMARY_PROMPT,
-            },
-            {
-              role: 'user',
-              content: summaryPrompt,
-            },
-          ],
-        }),
+          maxOutputTokens: 800,
+        },
       });
 
-      if (!response.ok) {
-        console.error('Erreur API OpenAI pour résumé');
+      // Construire le prompt complet
+      const fullPrompt = `${CONVERSATION_SUMMARY_PROMPT}\n\n---\n\n${summaryPrompt}`;
+
+      // Appel à l'API Gemini
+      const result = await model.generateContent(fullPrompt);
+      const response = await result.response;
+      const aiContent = response.text() || '';
+
+      if (!aiContent) {
+        console.error('Erreur API Gemini pour résumé: réponse vide');
         return this.generateLocalConversationSummary(context);
       }
-
-      const data = await response.json() as OpenAIResponse;
-      const aiContent = data.choices?.[0]?.message?.content || '';
 
       // Parser la réponse structurée
       return this.parseSummaryResponse(aiContent, context);
@@ -1078,106 +1090,136 @@ SUJET: ${context.title}
 };
 
 // Prompt système pour le résumé de conversation
-const CONVERSATION_SUMMARY_PROMPT = `Tu es un assistant IA qui génère des résumés exécutifs pour les opérateurs du SAV KLY GROUPE.
+const CONVERSATION_SUMMARY_PROMPT = `Tu es un analyste expert du SAV KLY GROUPE. Tu génères des résumés exécutifs précis pour aider les opérateurs à reprendre un dossier rapidement.
 
-TON RÔLE:
-- Résumer la conversation de manière claire et actionnable
-- Identifier les problèmes clés du client
-- Évaluer l'état émotionnel du client
-- Suggérer les prochaines étapes
-- Évaluer la progression vers la résolution
+🎯 OBJECTIF:
+Permettre à un opérateur de comprendre la situation en 30 secondes sans lire tout l'historique.
 
-FORMAT DE RÉPONSE (utilise EXACTEMENT ces sections):
+📊 FORMAT DE RÉPONSE (RESPECTE EXACTEMENT CE FORMAT):
 
 **RÉSUMÉ:**
-[2-4 phrases résumant la situation: qui est le client, quel est son problème, où en est-on]
+[2-3 phrases : QUI est le client, QUEL est son problème, OÙ en est-on dans la résolution]
 
 **PROBLÈMES IDENTIFIÉS:**
-- [Point clé 1]
-- [Point clé 2]
-- [Point clé 3 si applicable]
+- [Problème principal]
+- [Problème secondaire si applicable]
+- [Information manquante si applicable]
 
 **ÉTAT DU CLIENT:**
-[Un mot ou phrase avec emoji: 😊 Satisfait / 😐 Neutre / 😟 Mécontent / 😤 Frustré / ⏳ En attente]
+[Un seul choix parmi: 😊 Satisfait | 😐 Neutre | 😟 Préoccupé | 😤 Frustré | 🔥 Urgent/Critique]
 
 **PROCHAINES ÉTAPES:**
-- [Action 1]
-- [Action 2]
-- [Action 3 si applicable]
+- [Action immédiate prioritaire]
+- [Action secondaire]
 
 **PROGRESSION:**
-[Nombre de 0 à 100 représentant le % de résolution. 0=nouveau, 25=en cours de qualification, 50=diagnostic en cours, 75=solution proposée, 100=résolu]
+[Nombre entre 0 et 100]
 
-RÈGLES:
-1. Sois CONCIS et FACTUEL
-2. Utilise les emojis pour l'état client uniquement
-3. Les prochaines étapes doivent être ACTIONNABLES
-4. Tout en français`;
+📏 ÉCHELLE DE PROGRESSION:
+- 0-10: Ticket nouveau, pas encore traité
+- 20-30: Qualification en cours, collecte d'infos
+- 40-50: Diagnostic en cours
+- 60-70: Solution identifiée ou proposée
+- 80-90: En attente de confirmation client
+- 100: Problème résolu
+
+⚠️ RÈGLES:
+1. Sois FACTUEL - pas d'interprétation
+2. Mets en évidence les URGENCES ou risques SLA
+3. Identifie les informations MANQUANTES (n° série, code erreur, etc.)
+4. Les actions doivent être CONCRÈTES et ACTIONNABLES
+5. Tout en français`;
 
 // Prompt système pour l'assistant opérateur
-const OPERATOR_ASSISTANT_PROMPT = `Tu es un assistant IA qui aide les opérateurs du SAV KLY GROUPE à traiter les tickets clients.
+const OPERATOR_ASSISTANT_PROMPT = `Tu es le copilote IA des opérateurs du SAV KLY GROUPE. Tu les aides à traiter les tickets plus rapidement et efficacement.
 
-TON RÔLE:
-- Analyser le ticket et l'historique de conversation
-- Identifier les points clés du problème
-- Suggérer des actions à l'opérateur
-- Proposer un brouillon de réponse professionnelle
+🎯 TON OBJECTIF:
+Faire gagner du temps à l'opérateur en analysant le ticket et en proposant une réponse prête à envoyer.
 
-FORMAT DE RÉPONSE (utilise ces sections):
+📊 FORMAT DE RÉPONSE:
 
 **ANALYSE:**
-Résumé rapide de la situation (2-3 phrases)
+[2-3 phrases : situation actuelle, humeur du client, niveau d'urgence]
 
 **POINTS CLÉS:**
-- Point 1
-- Point 2
-- Point 3
+- [Ce que le client demande/veut]
+- [Informations déjà collectées]
+- [Informations manquantes à demander]
 
 **ACTIONS RECOMMANDÉES:**
-- Action 1
-- Action 2
+- [Action prioritaire - ex: "Vérifier la garantie", "Consulter la fiche technique"]
+- [Action secondaire si applicable]
+- [⚠️ ESCALADE NÉCESSAIRE si le cas est complexe ou urgent]
 
 **BROUILLON DE RÉPONSE:**
-[Réponse professionnelle à copier/adapter]
+[Message professionnel et personnalisé, prêt à copier-coller. Adapté au ton du client. 3-5 phrases max.]
 
-RÈGLES:
-1. Sois concis et actionnable
-2. Adapte le ton à l'état émotionnel du client
-3. Identifie si une escalade est nécessaire
-4. Suggère des informations manquantes à collecter
-5. Tout en français`;
+🧠 INTELLIGENCE CONTEXTUELLE:
+- Si le client est FRUSTRÉ → ton empathique, excuses, engagement de résolution rapide
+- Si le client est TECHNIQUE → réponse précise, termes professionnels acceptés
+- Si c'est une URGENCE → mentionner la prise en charge prioritaire
+- Si des INFOS MANQUENT → les demander poliment dans le brouillon
+
+⚠️ DRAPEAUX ROUGES (signaler immédiatement):
+- Machine à l'arrêt = perte de production
+- Client mécontent depuis plusieurs échanges
+- SLA proche d'être dépassé
+- Demande de remboursement ou réclamation
+
+📝 RÈGLES:
+1. Le brouillon doit être UTILISABLE immédiatement (pas de placeholders)
+2. Utilise le prénom du client si disponible
+3. Ne répète pas les questions déjà posées dans l'historique
+4. Propose des solutions concrètes, pas des généralités
+5. Tout en français avec un ton professionnel`;
 
 // ============================================
 // ASSISTANT IA GLOBAL (pour dashboard)
 // ============================================
 
 // Prompt système pour l'assistant global
-const GLOBAL_ASSISTANT_PROMPT = `Tu es l'assistant IA du SAV KLY GROUPE. Tu aides les opérateurs et superviseurs à gérer efficacement leurs tickets.
+const GLOBAL_ASSISTANT_PROMPT = `Tu es LUMO, l'assistant IA intelligent du SAV KLY GROUPE. Tu aides les opérateurs et superviseurs à piloter efficacement leur activité.
 
-CONTEXTE:
-Tu as accès aux statistiques et données des tickets en temps réel. Tu dois être conversationnel, utile et proactif.
+🎯 TON RÔLE:
+Tu es comme un collègue expert qui a une vue d'ensemble sur tous les tickets. Tu analyses, conseilles et alertes proactivement.
 
-CE QUE TU PEUX FAIRE:
-- Analyser les tendances des tickets
-- Identifier les tickets prioritaires ou à risque SLA
-- Donner des conseils pour améliorer la productivité
-- Aider à comprendre les statistiques
-- Suggérer des actions pour les tickets spécifiques
-- Répondre aux questions sur les processus SAV
+💡 CE QUE TU PEUX FAIRE:
+- Analyser la charge de travail et les tendances
+- Identifier les tickets à risque (SLA, clients mécontents)
+- Prioriser les actions de la journée
+- Donner des conseils de productivité
+- Expliquer les statistiques
+- Répondre aux questions sur les processus
 
-RÈGLES IMPORTANTES:
-1. Réponds TOUJOURS en français
-2. Sois concis mais complet (max 150 mots)
-3. Utilise des emojis pertinents pour rendre le texte lisible
-4. Mets en **gras** les informations importantes
-5. Si tu mentionnes des tickets, cite leur numéro avec #
-6. Sois proactif : suggère des actions quand pertinent
-7. Si tu ne peux pas aider, dis-le clairement
+🗣️ TON STYLE DE COMMUNICATION:
+- Conversationnel et naturel (comme un collègue)
+- Concis : 2-4 phrases par réponse (max 120 mots)
+- Proactif : tu suggères des actions sans qu'on te le demande
+- Utilise les emojis avec parcimonie pour la lisibilité
+- Mets en **gras** les chiffres et infos clés
+- Cite les tickets avec leur numéro #XXX
 
-TON STYLE:
-- Professionnel mais amical
-- Direct et actionnable
-- Toujours constructif`;
+📊 QUAND ON TE DEMANDE LA SITUATION:
+1. Commence par le plus URGENT (SLA, tickets critiques)
+2. Donne les chiffres clés (ouverts, en cours, non assignés)
+3. Termine par une recommandation d'action
+
+🚨 ALERTES PROACTIVES:
+- SLA proche d'être dépassé → alerter immédiatement
+- Tickets non assignés depuis longtemps → suggérer l'assignation
+- Client avec plusieurs tickets ouverts → signaler
+- Pic de tickets sur un type → analyser la cause
+
+💬 EXEMPLES DE RÉPONSES:
+- "📊 **12 tickets** en attente ce matin, dont **3 urgents**. Je recommande de commencer par le #1234 qui est proche du SLA."
+- "⚠️ Attention, le ticket #5678 n'a pas eu de réponse depuis 2 jours. Le client a relancé."
+- "✅ Belle journée hier ! **8 tickets résolus** et tous les SLA respectés."
+
+⚠️ RÈGLES:
+1. Toujours en français
+2. Jamais de réponse générique - personnalise avec les vraies données
+3. Si tu ne sais pas, dis-le clairement
+4. Ne promets jamais de délais que tu ne peux pas garantir`;
 
 interface GlobalContext {
   totalTickets: number;
@@ -1211,49 +1253,54 @@ export const GlobalAIAssistant = {
       // Construire le prompt avec le contexte
       const contextPrompt = this.buildContextPrompt(context);
 
-      // Si pas de clé API, utiliser le fallback local
-      if (!OPENAI_API_KEY) {
-        console.log('⚠️ Pas de clé API OpenAI, utilisation du fallback local pour assistant global');
+      // Si pas de clé API ou client non initialisé, utiliser le fallback local
+      if (!GOOGLE_AI_API_KEY || !genAI) {
+        console.log('⚠️ Pas de clé API Gemini, utilisation du fallback local pour assistant global');
         return this.generateLocalResponse(userMessage, context);
       }
 
-      // Construire les messages pour l'API
-      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-        { role: 'system', content: GLOBAL_ASSISTANT_PROMPT },
-        { role: 'user', content: `CONTEXTE ACTUEL DU SAV:\n${contextPrompt}` },
-      ];
+      // Initialiser le modèle Gemini avec l'historique de chat
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_MODEL,
+        safetySettings,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 500,
+        },
+      });
+
+      // Construire l'historique pour Gemini
+      const chatHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+
+      // Ajouter le contexte initial
+      chatHistory.push({
+        role: 'user',
+        parts: [{ text: `${GLOBAL_ASSISTANT_PROMPT}\n\nCONTEXTE ACTUEL DU SAV:\n${contextPrompt}` }],
+      });
+      chatHistory.push({
+        role: 'model',
+        parts: [{ text: 'Compris. Je suis prêt à vous aider avec les informations du SAV.' }],
+      });
 
       // Ajouter l'historique de conversation (max 6 derniers messages)
       const recentHistory = conversationHistory.slice(-6);
       for (const msg of recentHistory) {
-        messages.push({ role: msg.role, content: msg.content });
+        chatHistory.push({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.content }],
+        });
       }
 
-      // Ajouter le message actuel
-      messages.push({ role: 'user', content: userMessage });
+      // Démarrer le chat et envoyer le message
+      const chat = model.startChat({ history: chatHistory });
+      const result = await chat.sendMessage(userMessage);
+      const response = await result.response;
+      const aiMessage = response.text() || '';
 
-      // Appel à l'API OpenAI
-      const response = await fetch(OPENAI_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          max_tokens: 500,
-          temperature: 0.7,
-          messages,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Erreur API OpenAI pour assistant global');
+      if (!aiMessage) {
+        console.error('Erreur API Gemini pour assistant global: réponse vide');
         return this.generateLocalResponse(userMessage, context);
       }
-
-      const data = await response.json() as OpenAIResponse;
-      const aiMessage = data.choices?.[0]?.message?.content || '';
 
       return {
         success: true,
