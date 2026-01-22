@@ -31,8 +31,8 @@ interface NavItem {
 }
 
 const mainNavItems: NavItem[] = [
-  { label: 'Assistant intelligent', href: '/', icon: Sparkles, highlight: true },
-  { label: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Assistant intelligent', href: '/assistant', icon: Sparkles, highlight: true },
+  { label: 'Tableau de bord', href: '/', icon: LayoutDashboard },
   { label: 'Nouveau ticket', href: '/tickets/new', icon: PlusCircle },
   { label: 'Mes tickets', href: '/tickets', icon: Ticket },
   { label: 'Mes commandes', href: '/orders', icon: Package },
@@ -64,7 +64,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href ||
-            (item.href !== '/' && item.href !== '/dashboard' && location.pathname.startsWith(item.href.split('?')[0]));
+            (item.href !== '/' && item.href !== '/assistant' && location.pathname.startsWith(item.href.split('?')[0]));
 
           return (
             <NavLink
@@ -139,7 +139,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               Notre IA peut resoudre 80% des problemes instantanement.
             </p>
             <NavLink
-              to="/"
+              to="/assistant"
               onClick={onClose}
               className="inline-flex items-center text-sm font-medium bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors"
             >

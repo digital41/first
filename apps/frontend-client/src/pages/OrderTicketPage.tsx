@@ -369,41 +369,43 @@ export function OrderTicketPage() {
   const orderLines = order.lines || [];
 
   return (
-    <div className="max-w-3xl mx-auto pb-8 fade-in">
+    <div className="max-w-3xl mx-auto pb-8 fade-in px-1 sm:px-0">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <button
           onClick={() => navigate(`/orders/${orderNumber}`)}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          className="flex items-center text-sm text-gray-600 hover:text-gray-900 mb-3 sm:mb-4"
         >
-          <ArrowLeft size={18} className="mr-1" />
+          <ArrowLeft size={16} className="mr-1" />
           Retour à la commande
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">Signaler un problème</h1>
-        <p className="text-gray-600 mt-1">
-          Décrivez votre problème et nous vous aiderons rapidement.
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Signaler un problème</h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1">
+          Décrivez votre problème et nous vous aiderons.
         </p>
       </div>
 
       {/* Order Summary Card */}
-      <div className="card p-4 mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border-primary-200">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-            <Package className="text-primary-600" size={24} />
+      <div className="card p-3 sm:p-4 mb-4 sm:mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border-primary-200">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
+            <Package className="text-primary-600" size={20} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-gray-900">{order.orderNumber}</h3>
-              <span className="px-2 py-0.5 bg-white rounded-full text-xs font-medium text-primary-700">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base">{order.orderNumber}</h3>
+              <span className="px-2 py-0.5 bg-white rounded-full text-[10px] sm:text-xs font-medium text-primary-700">
                 {order.status}
               </span>
             </div>
-            <p className="text-sm text-gray-600 mt-1">
-              {order.orderDate && `Commandé le ${formatDate(order.orderDate)}`}
-              {order.totalAmount && ` • ${Number(order.totalAmount).toLocaleString('fr-FR')} € HT`}
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">
+              {order.orderDate && `${formatDate(order.orderDate)}`}
+              {order.totalAmount && (
+                <span className="hidden sm:inline"> • {Number(order.totalAmount).toLocaleString('fr-FR')} € HT</span>
+              )}
             </p>
             {orderLines.length > 0 && (
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
                 {orderLines.length} article{orderLines.length > 1 ? 's' : ''}
               </p>
             )}
@@ -412,15 +414,15 @@ export function OrderTicketPage() {
       </div>
 
       {/* Step 1: Issue Type Selection */}
-      <div className="card p-5 mb-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-            <span className="text-primary-700 font-bold text-sm">1</span>
+      <div className="card p-3 sm:p-5 mb-3 sm:mb-4">
+        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0">
+            <span className="text-primary-700 font-bold text-xs sm:text-sm">1</span>
           </div>
-          <h2 className="font-semibold text-gray-900">Quel est le type de problème ?</h2>
+          <h2 className="font-semibold text-gray-900 text-sm sm:text-base">Type de problème</h2>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {ORDER_ISSUE_TYPES.map((type) => {
             const Icon = type.icon;
             const isSelected = issueType === type.value;
@@ -432,20 +434,21 @@ export function OrderTicketPage() {
                   setPredefinedIssue('');
                 }}
                 className={cn(
-                  'p-4 rounded-xl border-2 text-center transition-all',
+                  'p-3 sm:p-4 rounded-xl border-2 text-center transition-all',
                   isSelected
                     ? 'border-primary-500 bg-primary-50 shadow-md'
                     : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                 )}
               >
                 <div className={cn(
-                  'w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2',
+                  'w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center mx-auto mb-2',
                   type.color
                 )}>
-                  <Icon size={24} />
+                  <Icon size={20} className="sm:hidden" />
+                  <Icon size={24} className="hidden sm:block" />
                 </div>
-                <p className="font-medium text-gray-900 text-sm">{type.label}</p>
-                <p className="text-xs text-gray-500 mt-1 hidden sm:block">{type.description}</p>
+                <p className="font-medium text-gray-900 text-xs sm:text-sm">{type.label}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 hidden sm:block">{type.description}</p>
               </button>
             );
           })}
@@ -454,18 +457,18 @@ export function OrderTicketPage() {
 
       {/* Step 2: Product Selection (if order has lines) */}
       {issueType && orderLines.length > 0 && (
-        <div className="card p-5 mb-4 fade-in">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-primary-700 font-bold text-sm">2</span>
+        <div className="card p-3 sm:p-5 mb-3 sm:mb-4 fade-in">
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-primary-700 font-bold text-xs sm:text-sm">2</span>
             </div>
-            <div>
-              <h2 className="font-semibold text-gray-900">Quel(s) produit(s) est concerné ?</h2>
-              <p className="text-sm text-gray-500">Sélectionnez un ou plusieurs produits (optionnel)</p>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-gray-900 text-sm sm:text-base">Produit(s) concerné(s)</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Sélectionnez un ou plusieurs (optionnel)</p>
             </div>
           </div>
 
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2 max-h-48 sm:max-h-64 overflow-y-auto -mx-1 px-1">
             {orderLines.map((line: OrderLine, index: number) => {
               const isSelected = selectedProducts.includes(line.productCode);
               return (
@@ -473,27 +476,27 @@ export function OrderTicketPage() {
                   key={`${line.productCode}-${index}`}
                   onClick={() => toggleProductSelection(line.productCode)}
                   className={cn(
-                    'w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3',
+                    'w-full p-2.5 sm:p-3 rounded-lg border-2 text-left transition-all flex items-center gap-2 sm:gap-3',
                     isSelected
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
                   )}
                 >
                   <div className={cn(
-                    'w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all',
+                    'w-5 h-5 sm:w-6 sm:h-6 rounded-md border-2 flex items-center justify-center transition-all shrink-0',
                     isSelected
                       ? 'border-primary-500 bg-primary-500'
                       : 'border-gray-300'
                   )}>
-                    {isSelected && <CheckCircle className="text-white" size={14} />}
+                    {isSelected && <CheckCircle className="text-white" size={12} />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{line.productName}</p>
-                    <p className="text-xs text-gray-500">
-                      Réf: {line.productCode} • Qté: {line.quantity}
+                    <p className="font-medium text-gray-900 text-sm sm:text-base line-clamp-2">{line.productName}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500">
+                      Réf: {line.productCode} <span className="hidden sm:inline">•</span> <span className="block sm:inline">Qté: {line.quantity}</span>
                     </p>
                   </div>
-                  <ShoppingBag className="text-gray-400" size={18} />
+                  <ShoppingBag className="text-gray-400 shrink-0 hidden sm:block" size={18} />
                 </button>
               );
             })}
@@ -503,25 +506,25 @@ export function OrderTicketPage() {
 
       {/* Step 3: Describe the issue */}
       {issueType && (
-        <div className="card p-5 mb-4 fade-in">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-primary-700 font-bold text-sm">{orderLines.length > 0 ? '3' : '2'}</span>
+        <div className="card p-3 sm:p-5 mb-3 sm:mb-4 fade-in">
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-primary-700 font-bold text-xs sm:text-sm">{orderLines.length > 0 ? '3' : '2'}</span>
             </div>
-            <div>
-              <h2 className="font-semibold text-gray-900">Décrivez votre problème</h2>
-              <p className="text-sm text-gray-500">Sélectionnez une option ou décrivez librement</p>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-gray-900 text-sm sm:text-base">Décrivez le problème</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Sélectionnez ou décrivez</p>
             </div>
           </div>
 
           {/* Quick selection buttons */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
             {PREDEFINED_ISSUES[issueType].map((issue) => (
               <button
                 key={issue}
                 onClick={() => setPredefinedIssue(predefinedIssue === issue ? '' : issue)}
                 className={cn(
-                  'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  'px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all',
                   predefinedIssue === issue
                     ? 'bg-primary-600 text-white shadow-md'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -534,49 +537,49 @@ export function OrderTicketPage() {
 
           {/* Custom description */}
           <div>
-            <label className="label flex items-center gap-2">
+            <label className="label text-sm flex items-center gap-2">
               <MessageSquare size={14} className="text-gray-400" />
               Détails supplémentaires
             </label>
             <textarea
               value={customDescription}
               onChange={(e) => setCustomDescription(e.target.value)}
-              placeholder="Décrivez plus en détail votre problème..."
-              className="input min-h-[100px] resize-y"
+              placeholder="Décrivez plus en détail..."
+              className="input min-h-[80px] sm:min-h-[100px] resize-y text-sm"
               maxLength={1000}
             />
-            <p className="text-xs text-gray-400 mt-1 text-right">
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-1 text-right">
               {customDescription.length}/1000
             </p>
           </div>
 
           {/* Technical fields */}
           {issueType === IssueType.TECHNICAL && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
               <div>
-                <label className="label flex items-center gap-2">
+                <label className="label text-sm flex items-center gap-2">
                   <Hash size={14} className="text-gray-400" />
-                  N° de série (si visible)
+                  N° de série
                 </label>
                 <input
                   type="text"
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
                   placeholder="Ex: SN-2024-ABC123"
-                  className="input"
+                  className="input text-sm"
                 />
               </div>
               <div>
-                <label className="label flex items-center gap-2">
+                <label className="label text-sm flex items-center gap-2">
                   <AlertTriangle size={14} className="text-orange-500" />
-                  Code erreur affiché
+                  Code erreur
                 </label>
                 <input
                   type="text"
                   value={errorCode}
                   onChange={(e) => setErrorCode(e.target.value)}
                   placeholder="Ex: E-404"
-                  className="input"
+                  className="input text-sm"
                 />
               </div>
             </div>
@@ -586,20 +589,20 @@ export function OrderTicketPage() {
 
       {/* Step 4: Photos/Files */}
       {issueType && (
-        <div className="card p-5 mb-4 fade-in">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-primary-700 font-bold text-sm">{orderLines.length > 0 ? '4' : '3'}</span>
+        <div className="card p-3 sm:p-5 mb-3 sm:mb-4 fade-in">
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-primary-700 font-bold text-xs sm:text-sm">{orderLines.length > 0 ? '4' : '3'}</span>
             </div>
-            <div>
-              <h2 className="font-semibold text-gray-900">Ajouter des photos</h2>
-              <p className="text-sm text-gray-500">Une photo aide souvent à mieux comprendre le problème</p>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-gray-900 text-sm sm:text-base">Ajouter des photos</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Optionnel mais utile</p>
             </div>
           </div>
 
           <div
             className={cn(
-              'border-2 border-dashed rounded-xl p-6 text-center transition-colors',
+              'border-2 border-dashed rounded-xl p-4 sm:p-6 text-center transition-colors',
               files.length >= 5
                 ? 'border-gray-200 bg-gray-50'
                 : 'border-gray-300 hover:border-primary-400 hover:bg-primary-50 cursor-pointer'
@@ -607,14 +610,14 @@ export function OrderTicketPage() {
           >
             {files.length < 5 ? (
               <label className="cursor-pointer block">
-                <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Camera className="text-gray-400" size={28} />
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                  <Camera className="text-gray-400" size={24} />
                 </div>
-                <p className="text-sm text-gray-600 font-medium">
-                  Cliquez pour ajouter des photos
+                <p className="text-xs sm:text-sm text-gray-600 font-medium">
+                  Ajouter des photos
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  JPG, PNG ou PDF • Max 5 fichiers
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
+                  JPG, PNG ou PDF • Max 5
                 </p>
                 <input
                   type="file"
@@ -625,12 +628,12 @@ export function OrderTicketPage() {
                 />
               </label>
             ) : (
-              <p className="text-sm text-gray-500">Nombre maximum de fichiers atteint</p>
+              <p className="text-xs sm:text-sm text-gray-500">Max atteint</p>
             )}
           </div>
 
           {files.length > 0 && (
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="mt-2 sm:mt-3 grid grid-cols-2 gap-2">
               {files.map((file, index) => (
                 <div
                   key={index}
@@ -640,20 +643,20 @@ export function OrderTicketPage() {
                     <img
                       src={URL.createObjectURL(file)}
                       alt={file.name}
-                      className="w-10 h-10 object-cover rounded"
+                      className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded shrink-0"
                     />
                   ) : (
-                    <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
-                      <FileText className="text-gray-500" size={18} />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-200 rounded flex items-center justify-center shrink-0">
+                      <FileText className="text-gray-500" size={16} />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-700 truncate">{file.name}</p>
-                    <p className="text-xs text-gray-400">{formatFileSize(file.size)}</p>
+                    <p className="text-[10px] sm:text-xs font-medium text-gray-700 truncate">{file.name}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-400">{formatFileSize(file.size)}</p>
                   </div>
                   <button
                     onClick={() => removeFile(index)}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
                   >
                     <X size={12} />
                   </button>
@@ -666,35 +669,37 @@ export function OrderTicketPage() {
 
       {/* Error message */}
       {error && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
-          <AlertTriangle className="text-red-500 shrink-0" size={18} />
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="flex items-center gap-2 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg mb-3 sm:mb-4">
+          <AlertTriangle className="text-red-500 shrink-0" size={16} />
+          <p className="text-xs sm:text-sm text-red-700">{error}</p>
         </div>
       )}
 
       {/* Submit button */}
       {issueType && (
-        <div className="flex items-center justify-between gap-4 fade-in">
+        <div className="flex items-center justify-between gap-3 fade-in">
           <button
             onClick={() => navigate(`/orders/${orderNumber}`)}
-            className="btn-outline"
+            className="btn-outline text-sm sm:text-base py-2 sm:py-2.5"
           >
             Annuler
           </button>
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || (!predefinedIssue && !customDescription.trim())}
-            className="btn-primary flex-1 sm:flex-none sm:min-w-[200px]"
+            className="btn-primary flex-1 sm:flex-none sm:min-w-[180px] text-sm sm:text-base py-2 sm:py-2.5"
           >
             {isSubmitting ? (
               <>
-                <Loader2 size={18} className="mr-2 animate-spin" />
-                Envoi en cours...
+                <Loader2 size={16} className="mr-1.5 sm:mr-2 animate-spin" />
+                <span className="hidden sm:inline">Envoi en cours...</span>
+                <span className="sm:hidden">Envoi...</span>
               </>
             ) : (
               <>
-                <CheckCircle size={18} className="mr-2" />
-                Envoyer ma demande
+                <CheckCircle size={16} className="mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Envoyer ma demande</span>
+                <span className="sm:hidden">Envoyer</span>
               </>
             )}
           </button>

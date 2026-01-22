@@ -73,25 +73,25 @@ function AppRoutes() {
       <Route path="/contact" element={<MainLayout><ContactPage /></MainLayout>} />
       <Route path="/help" element={<Navigate to="/faq" replace />} />
 
-      {/* Protected routes - Smart Home as default */}
+      {/* Protected routes - Dashboard as default */}
       <Route
         path="/"
         element={
           <ProtectedRoute>
             <MainLayout>
-              <SmartHomePage />
+              <DashboardPage />
             </MainLayout>
           </ProtectedRoute>
         }
       />
 
-      {/* Classic Dashboard (accessible via /dashboard) */}
+      {/* Assistant intelligent (accessible via /assistant) */}
       <Route
-        path="/dashboard"
+        path="/assistant"
         element={
           <ProtectedRoute>
             <MainLayout>
-              <DashboardPage />
+              <SmartHomePage />
             </MainLayout>
           </ProtectedRoute>
         }

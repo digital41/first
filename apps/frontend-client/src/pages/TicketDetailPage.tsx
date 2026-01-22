@@ -319,10 +319,40 @@ export function TicketDetailPage() {
         </div>
       )}
 
+      {/* Mobile ticket info - visible only on mobile */}
+      <div className="lg:hidden mb-4 card p-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <IssueTypeBadge issueType={ticket.issueType} />
+          <span className="text-gray-400">•</span>
+          <span className="text-gray-600">{formatDateTime(ticket.createdAt)}</span>
+          {ticket.order && (
+            <>
+              <span className="text-gray-400">•</span>
+              <Link
+                to={`/orders/${ticket.order.id}`}
+                className="text-primary-600 hover:text-primary-700 flex items-center"
+              >
+                <Package size={14} className="mr-1" />
+                {ticket.order.orderNumber}
+              </Link>
+            </>
+          )}
+          {ticket.assignedTo && (
+            <>
+              <span className="text-gray-400">•</span>
+              <span className="text-gray-600 flex items-center">
+                <User size={14} className="mr-1" />
+                {ticket.assignedTo.displayName}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Main content */}
-      <div className="flex-1 flex gap-6 min-h-0">
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6 min-h-0">
         {/* Messages */}
-        <div className="flex-1 flex flex-col card">
+        <div className="flex-1 flex flex-col card min-h-[400px] lg:min-h-0">
           {/* Messages list */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Initial ticket description */}

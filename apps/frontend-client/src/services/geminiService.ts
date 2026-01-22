@@ -2,37 +2,64 @@ import { GoogleGenerativeAI, ChatSession, Content } from '@google/generative-ai'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-// System prompt for industrial SAV context
-const SYSTEM_PROMPT = `Tu es un assistant virtuel expert pour le Service Après-Vente (SAV) industriel de KLY Groupe.
+// System prompt for Lumo - Agent IA autonome KLY Groupe
+const SYSTEM_PROMPT = `Tu es **Lumo**, l'agent IA intelligent et autonome de KLY Groupe. Tu n'es pas un simple assistant, tu es un véritable expert capable de prendre des décisions et d'accompagner les clients de A à Z.
 
-CONTEXTE:
-- Tu aides les clients professionnels avec leurs équipements industriels
-- Tu dois être précis, professionnel et efficace
-- Tu parles français de manière formelle mais accessible
+🎯 TON IDENTITÉ:
+- Tu t'appelles Lumo, agent IA dédié KLY Groupe
+- Tu es autonome, proactif et débrouillard
+- Tu as accès aux données Sage 100 (commandes, livraisons, factures, clients)
+- Tu connais parfaitement le catalogue produits KLY Groupe
+- Tu es expert en équipements industriels (maintenance, dépannage, specs techniques)
 
-TES CAPACITÉS:
-1. Diagnostic de pannes et dysfonctionnements
-2. Guide de dépannage étape par étape
-3. Informations sur les procédures de maintenance
-4. Aide sur les commandes et livraisons
-5. Questions sur la facturation
+💡 TES 3 DOMAINES D'EXPERTISE:
 
-RÈGLES IMPORTANTES:
-- Si tu ne peux pas résoudre le problème, suggère de créer un ticket
-- Ne donne jamais d'informations techniques dangereuses
-- Sois concis mais complet dans tes réponses
-- Propose toujours des solutions pratiques
-- Si le problème nécessite une intervention physique, oriente vers un ticket
+1. **COMMERCIAL** - Tu es un conseiller commercial expert:
+   - Tu connais les produits, tarifs, disponibilités
+   - Tu peux recommander des équipements selon les besoins
+   - Tu informes sur les promotions et nouveautés
+   - Tu guides vers les bons interlocuteurs pour les devis
 
-TONALITÉ:
-- Professionnel et courtois
+2. **SUIVI CLIENT SAGE** - Tu es connecté au système Sage 100:
+   - Tu peux consulter l'état des commandes (BC, BL, FA)
+   - Tu informes sur les délais de livraison
+   - Tu expliques les factures et avoirs
+   - Tu connais l'historique client
+
+3. **SUPPORT TECHNIQUE** - Tu es un technicien expert:
+   - Tu diagnostiques les pannes et dysfonctionnements
+   - Tu guides le dépannage étape par étape
+   - Tu interprètes les codes erreur
+   - Tu conseilles sur la maintenance préventive
+
+🧠 TON COMPORTEMENT D'AGENT AUTONOME:
+- Tu analyses la situation avant de répondre
+- Tu poses des questions pertinentes pour affiner ton diagnostic
+- Tu proposes des solutions concrètes et actionnables
+- Tu prends des initiatives (ex: suggérer une vérification, proposer un produit alternatif)
+- Tu anticipes les besoins du client
+- Tu sais dire quand tu as besoin d'un humain (escalade vers ticket)
+
+⚡ TES RÈGLES:
+- Toujours te présenter comme "Lumo" si on te demande qui tu es
+- Être direct et efficace, pas de blabla inutile
+- Donner des réponses structurées et claires
+- Proposer des actions concrètes
+- Si tu ne peux pas résoudre seul → proposer de créer un ticket
+- Toujours rester positif et orienté solution
+
+🎨 TA PERSONNALITÉ:
+- Professionnel mais chaleureux
+- Confiant dans tes connaissances
 - Empathique face aux problèmes
-- Rassurant et confiant
+- Proactif et orienté solution
+- Un brin d'humour quand c'est approprié
 
-FORMAT DE RÉPONSE:
-- Utilise des listes à puces pour la clarté
-- Propose des étapes numérotées pour les procédures
-- Mets en évidence les points importants`;
+📝 FORMAT DE RÉPONSE:
+- Réponses structurées avec des bullet points
+- Étapes numérotées pour les procédures
+- Mise en évidence des points importants en **gras**
+- Emojis pertinents pour rendre les réponses vivantes`;
 
 // Knowledge base for common issues
 const KNOWLEDGE_BASE = {
@@ -192,14 +219,14 @@ class GeminiService {
         this.chatSession = model.startChat({
           history: [{
             role: 'user',
-            parts: [{ text: 'Tu es un assistant SAV industriel. ' + SYSTEM_PROMPT }]
+            parts: [{ text: SYSTEM_PROMPT }]
           }, {
             role: 'model',
-            parts: [{ text: 'Compris, je suis prêt à aider les clients du SAV KLY.' }]
+            parts: [{ text: 'Compris ! Je suis Lumo, agent IA autonome de KLY Groupe. Je suis prêt à accompagner les clients sur leurs questions commerciales, leur suivi Sage et le support technique. Je suis proactif, efficace et orienté solution. C\'est parti ! 🚀' }]
           }],
           generationConfig: {
-            maxOutputTokens: 1000,
-            temperature: 0.7,
+            maxOutputTokens: 1500,
+            temperature: 0.8,
           },
         });
 
@@ -302,64 +329,74 @@ class GeminiService {
     }
   }
 
-  // Smart fallback that provides helpful responses without AI
+  // Smart fallback that provides helpful responses without AI - Lumo persona
   private getSmartFallbackResponse(userMessage: string): string {
     const input = userMessage.toLowerCase();
 
+    // Identity questions
+    if (input.includes('qui es-tu') || input.includes('qui êtes-vous') || input.includes('c\'est quoi lumo') || input.includes('tu es qui')) {
+      return "Je suis **Lumo** 🌟, l'agent IA autonome de KLY Groupe !\n\nJe suis là pour vous accompagner sur :\n• 🛒 **Commercial** - Produits, tarifs, disponibilités\n• 📦 **Suivi Sage** - Commandes, livraisons, factures\n• 🔧 **Technique** - Dépannage, codes erreur, maintenance\n\nJe suis proactif, efficace et toujours là pour vous. Qu'est-ce que je peux faire pour vous ?";
+    }
+
     // Greetings
     if (input.includes('bonjour') || input.includes('salut') || input.includes('hello') || input.includes('bonsoir')) {
-      return "Bonjour ! Je suis l'assistant virtuel du SAV KLY. Comment puis-je vous aider aujourd'hui ?\n\nJe peux vous aider avec :\n- Les problèmes techniques\n- Les questions de livraison\n- La facturation\n- Créer un ticket de support";
+      return "Hey ! 👋 C'est Lumo, votre agent IA KLY Groupe.\n\nJe suis prêt à vous aider sur :\n• 🛒 Questions **commerciales** (produits, prix)\n• 📦 **Suivi Sage** (commandes, livraisons)\n• 🔧 Support **technique** (dépannage, maintenance)\n\nAllez-y, dites-moi ce qui vous amène !";
     }
 
     // Thanks
-    if (input.includes('merci') || input.includes('super') || input.includes('parfait')) {
-      return "Je vous en prie ! N'hésitez pas si vous avez d'autres questions. Je reste à votre disposition.";
+    if (input.includes('merci') || input.includes('super') || input.includes('parfait') || input.includes('génial')) {
+      return "Avec plaisir ! 😊 C'est mon job de vous faciliter la vie.\n\nN'hésitez pas si vous avez d'autres questions - je suis là 24/7 !";
     }
 
     // Human agent request
-    if (input.includes('agent') || input.includes('humain') || input.includes('parler à quelqu')) {
-      return "Je comprends que vous souhaitez parler à un agent. Pour une assistance personnalisée, je vous recommande de **créer un ticket**. Notre équipe vous répondra dans les plus brefs délais (généralement sous 24h).\n\n👉 Cliquez sur \"Créer un ticket\" dans le menu.";
+    if (input.includes('agent') || input.includes('humain') || input.includes('parler à quelqu') || input.includes('conseiller')) {
+      return "Je comprends, parfois on a besoin de parler à un humain ! 🙂\n\nJe vais vous orienter vers l'équipe :\n\n1. **Créez un ticket** - Un technicien qualifié prendra le relais\n2. Tout notre échange sera transmis pour plus d'efficacité\n3. Réponse garantie sous **24h** (souvent plus rapide)\n\n👉 Voulez-vous que je prépare le ticket avec les infos de notre conversation ?";
     }
 
     // Ticket creation
     if (input.includes('créer') && input.includes('ticket')) {
-      return "Pour créer un ticket :\n1. Cliquez sur **\"Nouveau ticket\"** dans le menu\n2. Sélectionnez le type de problème\n3. Décrivez votre situation\n4. Ajoutez des photos si nécessaire\n\nNotre équipe vous répondra rapidement !";
+      return "Parfait, je vous guide ! 📝\n\n**Pour créer votre ticket :**\n1. Menu → **\"Nouveau ticket\"**\n2. Choisissez le type de demande\n3. Décrivez votre situation\n4. Joignez des photos si utile\n\n💡 **Mon conseil** : Plus vous êtes précis, plus la réponse sera rapide !";
     }
 
     // Order/delivery tracking
     if (input.includes('commande') || input.includes('livraison') || input.includes('suivi') || input.includes('colis')) {
-      return "Pour suivre votre commande :\n1. Accédez à **\"Mes commandes\"** dans le menu\n2. Cliquez sur la commande concernée\n3. Consultez le statut de livraison\n\nSi vous avez un problème de livraison (retard, colis endommagé), créez un ticket de type \"Livraison\".";
+      return "📦 **Suivi de commande** - Je m'en occupe !\n\n**Pour voir votre commande :**\n1. Allez dans **\"Mes commandes\"**\n2. Cliquez sur la commande\n3. Tout le suivi est là (BC, BL, FA)\n\n**Un souci ?** Dites-moi :\n• Retard de livraison ?\n• Colis endommagé ?\n• Mauvais article ?\n\nJe suis là pour résoudre ça avec vous !";
     }
 
     // Technical issues
     if (input.includes('panne') || input.includes('marche pas') || input.includes('fonctionne pas') || input.includes('problème technique')) {
-      return "Pour un problème technique, voici les premières vérifications :\n\n1. **Alimentation** - Vérifiez que l'appareil est bien branché\n2. **Redémarrage** - Essayez d'éteindre et rallumer l'appareil\n3. **Voyants** - Notez les voyants allumés ou codes erreur\n\nSi le problème persiste, créez un ticket de type \"Technique\" avec une description détaillée.";
+      return "🔧 **Mode dépannage activé !**\n\nAvant d'aller plus loin, vérifions ensemble :\n\n1. ⚡ **Alimentation** - L'appareil est bien branché ?\n2. 🔄 **Redémarrage** - On a essayé le classique off/on ?\n3. 🚨 **Voyants/Codes** - Il y a des messages d'erreur ?\n\nDonnez-moi plus de détails sur ce qui se passe, je vais analyser ça !";
+    }
+
+    // Error codes
+    if (input.includes('code erreur') || input.includes('erreur') || input.includes('code e') || input.includes('erreur e')) {
+      return "🔍 **Code erreur détecté !**\n\nDonnez-moi le code exact (ex: E01, ERR-42, etc.) et je vais :\n1. Vous expliquer ce qu'il signifie\n2. Vous guider pour le résoudre\n3. Vous dire si une intervention est nécessaire\n\nQuel est le code affiché ?";
     }
 
     // Billing
     if (input.includes('facture') || input.includes('paiement') || input.includes('avoir') || input.includes('remboursement')) {
-      return "Pour les questions de facturation :\n\n- **Factures** : Disponibles dans \"Mes commandes\" (téléchargement PDF)\n- **Avoir/Remboursement** : Créez un ticket de type \"Facturation\" avec le numéro de facture\n\nLes remboursements sont traités sous 5-10 jours ouvrés.";
+      return "💰 **Questions facturation** - Je gère !\n\n• **Factures** → Disponibles dans \"Mes commandes\" (PDF)\n• **Avoir** → Visible sur votre espace client\n• **Remboursement** → Traité sous 5-10 jours\n\nVous cherchez une facture spécifique ? Donnez-moi le numéro de commande !";
     }
 
-    // Default helpful response
-    return "Je n'ai pas trouvé de réponse spécifique à votre question. Voici comment je peux vous aider :\n\n" +
-      "📋 **Problème technique** - Diagnostic et dépannage\n" +
-      "📦 **Livraison** - Suivi et réclamations\n" +
-      "💰 **Facturation** - Factures et remboursements\n" +
-      "🎫 **Ticket** - Créer une demande de support\n\n" +
-      "Pouvez-vous préciser votre demande ou créer un ticket pour une assistance personnalisée ?";
+    // Products / Commercial
+    if (input.includes('produit') || input.includes('prix') || input.includes('tarif') || input.includes('catalogue') || input.includes('disponible')) {
+      return "🛒 **Questions commerciales** - Mon domaine !\n\nJe peux vous aider sur :\n• **Catalogue** - Trouver le bon produit\n• **Prix/Tarifs** - Infos tarifaires\n• **Disponibilité** - Stock et délais\n• **Recommandations** - Selon vos besoins\n\nQu'est-ce que vous recherchez exactement ?";
+    }
+
+    // Default helpful response - Lumo style
+    return "Hmm, laissez-moi reformuler pour bien vous aider ! 🤔\n\n**Mes domaines d'expertise :**\n• 🛒 **Commercial** - Produits, tarifs, disponibilités\n• 📦 **Suivi Sage** - Commandes, livraisons, factures\n• 🔧 **Technique** - Dépannage, codes erreur, maintenance\n\nPouvez-vous me donner plus de détails sur votre demande ?\n\n💡 Sinon, on peut toujours créer un **ticket** et un humain prendra le relais !";
   }
 
   private formatDiagnosticResponse(diagnostic: DiagnosticResult, originalQuery: string): string {
     const categoryLabels: Record<string, string> = {
-      technical: 'Problème technique',
-      delivery: 'Livraison',
-      billing: 'Facturation'
+      technical: '🔧 Problème technique',
+      delivery: '📦 Livraison',
+      billing: '💰 Facturation'
     };
 
-    let response = `Je comprends que vous rencontrez un problème de type **${categoryLabels[diagnostic.category] || diagnostic.category}**.\n\n`;
+    let response = `J'ai analysé votre situation - il s'agit d'un **${categoryLabels[diagnostic.category] || diagnostic.category}**.\n\n`;
 
-    response += `Voici les étapes à suivre :\n\n`;
+    response += `**Voici mon plan d'action :**\n\n`;
 
     diagnostic.solutions.forEach((solution, index) => {
       response += `${index + 1}. ${solution}\n`;
@@ -367,9 +404,9 @@ class GeminiService {
 
     if (diagnostic.needsTicket) {
       response += `\n---\n\n`;
-      response += `Si ces étapes ne résolvent pas le problème, je vous recommande de **créer un ticket** pour qu'un de nos techniciens puisse vous assister.`;
+      response += `💡 Si ça ne résout pas le souci, pas de panique ! On peut **créer un ticket** et un technicien prendra le relais avec tout le contexte de notre échange.`;
     } else {
-      response += `\n---\n\nCes informations devraient répondre à votre question. N'hésitez pas si vous avez besoin de précisions !`;
+      response += `\n---\n\n✅ Normalement, ça devrait résoudre votre problème. Dites-moi si vous avez besoin de plus de détails !`;
     }
 
     return response;
@@ -378,20 +415,20 @@ class GeminiService {
   private getFallbackResponse(userMessage: string): string {
     const input = userMessage.toLowerCase();
 
-    // Simple keyword matching for offline mode
+    // Simple keyword matching for offline mode - Lumo persona
     if (input.includes('bonjour') || input.includes('salut') || input.includes('hello')) {
-      return "Bonjour ! Je suis l'assistant virtuel du SAV KLY. Comment puis-je vous aider aujourd'hui ?";
+      return "Hey ! 👋 C'est Lumo. Comment puis-je vous aider ?";
     }
 
     if (input.includes('merci')) {
-      return "Je vous en prie ! N'hésitez pas si vous avez d'autres questions.";
+      return "Avec plaisir ! 😊 Je reste dispo si besoin !";
     }
 
     if (input.includes('ticket') || input.includes('agent') || input.includes('humain')) {
-      return "Je comprends que vous souhaitez parler à un agent. Vous pouvez créer un ticket et notre équipe vous répondra dans les plus brefs délais.";
+      return "Pas de souci ! Créez un ticket et un de nos experts vous contactera rapidement. 🎯";
     }
 
-    return "Je comprends votre demande. Pour mieux vous aider, pourriez-vous me donner plus de détails sur votre problème ? Vous pouvez également créer un ticket pour une assistance personnalisée.";
+    return "Je suis Lumo ! 🌟 Donnez-moi plus de détails et je vais vous aider. Sinon, on peut créer un ticket ensemble !";
   }
 
   // Get suggestions based on user input

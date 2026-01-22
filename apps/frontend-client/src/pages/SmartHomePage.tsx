@@ -56,8 +56,8 @@ export function SmartHomePage() {
     navigate('/tickets/new', {
       state: {
         prefill: {
-          title: 'Demande suite conversation assistant IA',
-          description: `Résumé de la conversation:\n\n${summary}`,
+          title: 'Demande suite conversation avec Lumo',
+          description: `Résumé de la conversation avec Lumo:\n\n${summary}`,
           issueType: 'OTHER',
           priority: 'MEDIUM'
         }
@@ -105,7 +105,7 @@ export function SmartHomePage() {
                 className="flex items-center justify-center px-6 py-4 bg-white/10 backdrop-blur text-white border-2 border-white/30 rounded-xl font-semibold hover:bg-white/20 transition-all"
               >
                 <Bot size={20} className="mr-2" />
-                Discuter avec l'IA
+                Discuter avec Lumo
               </button>
             </div>
           </div>
@@ -195,9 +195,9 @@ export function SmartHomePage() {
               <div className="w-14 h-14 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Bot className="text-primary-600" size={28} />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Assistant IA</h3>
+              <h3 className="font-semibold text-gray-900 mb-2">Lumo - Assistant IA</h3>
               <p className="text-sm text-gray-600">
-                Propulsé par Google Gemini, notre assistant comprend vos questions et propose des solutions instantanées.
+                Votre assistant technique & client, capable de répondre aux questions commerciales, suivi Sage et techniques produits.
               </p>
             </div>
             <div className="text-center">
@@ -251,18 +251,18 @@ export function SmartHomePage() {
     return (
       <div className="min-h-[calc(100vh-8rem)]">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Diagnostic guidé</h1>
-            <p className="text-gray-600">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Diagnostic guidé</h1>
+            <p className="text-sm sm:text-base text-gray-600">
               Répondez aux questions pour trouver la solution à votre problème
             </p>
           </div>
           <button
             onClick={() => setViewMode('home')}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-sm text-gray-500 hover:text-gray-700 self-start sm:self-auto"
           >
-            Retour à l'accueil
+            ← Retour à l'accueil
           </button>
         </div>
 

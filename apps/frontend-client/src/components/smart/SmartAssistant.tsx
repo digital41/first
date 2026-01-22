@@ -30,17 +30,17 @@ interface SmartAssistantProps {
 }
 
 const QUICK_ACTIONS = [
-  { id: 'status', label: 'Suivre ma commande', icon: '📦' },
-  { id: 'technical', label: 'Problème technique', icon: '🔧' },
-  { id: 'invoice', label: 'Obtenir ma facture', icon: '📄' },
-  { id: 'return', label: 'Retourner un produit', icon: '↩️' },
+  { id: 'commercial', label: 'Question produit', icon: '🛒' },
+  { id: 'status', label: 'Suivi commande', icon: '📦' },
+  { id: 'technical', label: 'Support technique', icon: '🔧' },
+  { id: 'invoice', label: 'Facturation', icon: '💰' },
 ];
 
 const SUGGESTIONS = [
-  'Mon équipement ne démarre plus',
-  'Ma livraison est en retard',
-  'Je cherche ma facture',
-  'J\'ai un code erreur',
+  'Quel produit me conseilles-tu pour... ?',
+  'Où en est ma commande ?',
+  'Mon équipement affiche une erreur',
+  'J\'ai besoin de ma facture',
 ];
 
 export function SmartAssistant({
@@ -70,7 +70,7 @@ export function SmartAssistant({
         setMessages([
           {
             role: 'assistant',
-            content: `Bonjour ! Je suis l'assistant virtuel KLY. 🤖\n\nJe suis là pour vous aider avec vos questions techniques, le suivi de vos commandes ou toute autre demande.\n\n**Comment puis-je vous aider ?**`,
+            content: `Bonjour ! Je suis **Lumo**, votre assistant intelligent KLY Groupe. ✨\n\nJe suis là pour vous accompagner sur :\n• **Questions commerciales** - produits, tarifs, disponibilités\n• **Suivi client Sage** - commandes, livraisons, factures\n• **Support technique** - dépannage, codes erreur, guides\n\n**Comment puis-je vous aider aujourd'hui ?**`,
             timestamp: new Date()
           }
         ]);
@@ -130,7 +130,7 @@ export function SmartAssistant({
     } catch (error) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Désolé, je rencontre un problème technique. Vous pouvez créer un ticket pour une assistance personnalisée.',
+        content: 'Désolé, je rencontre un souci technique momentané. Vous pouvez créer un ticket pour qu\'un conseiller vous assiste directement.',
         timestamp: new Date()
       }]);
     } finally {
@@ -153,18 +153,18 @@ export function SmartAssistant({
   };
 
   const handleQuickAction = (actionId: string) => {
-    const messages: Record<string, string> = {
-      status: 'Je voudrais suivre ma commande',
+    const quickMessages: Record<string, string> = {
+      commercial: 'J\'ai une question sur vos produits',
+      status: 'Où en est ma commande ?',
       technical: 'J\'ai un problème technique avec mon équipement',
-      invoice: 'Je cherche à télécharger ma facture',
-      return: 'Je souhaite retourner un produit'
+      invoice: 'J\'ai besoin d\'une facture'
     };
-    handleSend(messages[actionId]);
+    handleSend(quickMessages[actionId]);
   };
 
   const handleEscalate = () => {
     const conversationSummary = messages
-      .map(m => `${m.role === 'user' ? 'Client' : 'Assistant'}: ${m.content}`)
+      .map(m => `${m.role === 'user' ? 'Client' : 'Lumo'}: ${m.content}`)
       .join('\n');
 
     onEscalate(conversationSummary, {
@@ -178,7 +178,7 @@ export function SmartAssistant({
     geminiService.clearHistory();
     setMessages([{
       role: 'assistant',
-      content: 'Conversation réinitialisée. Comment puis-je vous aider ?',
+      content: '✨ Nouvelle conversation ! Je suis Lumo, prêt à vous aider. Comment puis-je vous accompagner ?',
       timestamp: new Date()
     }]);
     setShowSuggestions(true);
@@ -208,46 +208,50 @@ export function SmartAssistant({
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 overflow-hidden">
+    <div className="fixed inset-x-2 bottom-2 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-96 h-[calc(100vh-5rem)] sm:h-[600px] max-h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3">
-            <Bot size={24} />
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-3 sm:p-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center min-w-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center mr-2 sm:mr-3 shrink-0">
+            <Bot size={20} className="sm:hidden" />
+            <Bot size={24} className="hidden sm:block" />
           </div>
-          <div>
-            <h3 className="font-semibold">Assistant KLY</h3>
-            <div className="flex items-center text-xs text-primary-100">
-              <span className="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse" />
-              En ligne • Propulsé par IA
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm sm:text-base">Lumo</h3>
+            <div className="flex items-center text-[10px] sm:text-xs text-primary-100">
+              <span className="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse shrink-0" />
+              <span className="truncate">Assistant IA KLY</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-0.5 sm:space-x-1 shrink-0">
           <button
             onClick={handleReset}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors"
             title="Nouvelle conversation"
           >
-            <RotateCcw size={18} />
+            <RotateCcw size={16} className="sm:hidden" />
+            <RotateCcw size={18} className="hidden sm:block" />
           </button>
           <button
             onClick={onToggleMinimize}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
-            <Minimize2 size={18} />
+            <Minimize2 size={16} className="sm:hidden" />
+            <Minimize2 size={18} className="hidden sm:block" />
           </button>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
-            <X size={18} />
+            <X size={16} className="sm:hidden" />
+            <X size={18} className="hidden sm:block" />
           </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50">
         {messages.map((message, index) => (
           <div
             key={index}
@@ -267,7 +271,7 @@ export function SmartAssistant({
               {message.role === 'assistant' && (
                 <div className="flex items-center mb-1">
                   <Sparkles size={14} className="text-primary-500 mr-1" />
-                  <span className="text-xs text-primary-600 font-medium">Assistant IA</span>
+                  <span className="text-xs text-primary-600 font-medium">Lumo</span>
                 </div>
               )}
               <div
@@ -311,7 +315,7 @@ export function SmartAssistant({
             <div className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100">
               <div className="flex items-center space-x-2">
                 <Loader2 size={16} className="animate-spin text-primary-500" />
-                <span className="text-sm text-gray-500">Réflexion en cours...</span>
+                <span className="text-sm text-gray-500">Lumo réfléchit...</span>
               </div>
             </div>
           </div>
@@ -341,13 +345,13 @@ export function SmartAssistant({
 
       {/* Quick actions */}
       {messages.length <= 2 && (
-        <div className="px-4 py-2 border-t border-gray-100 bg-white">
-          <div className="flex space-x-2 overflow-x-auto pb-2">
+        <div className="px-3 sm:px-4 py-2 border-t border-gray-100 bg-white shrink-0">
+          <div className="flex space-x-2 overflow-x-auto pb-2 -mx-1 px-1">
             {QUICK_ACTIONS.map(action => (
               <button
                 key={action.id}
                 onClick={() => handleQuickAction(action.id)}
-                className="flex items-center px-3 py-1.5 bg-gray-100 rounded-full text-xs font-medium text-gray-700 hover:bg-primary-100 hover:text-primary-700 transition-colors whitespace-nowrap"
+                className="flex items-center px-2.5 sm:px-3 py-1 sm:py-1.5 bg-gray-100 rounded-full text-[11px] sm:text-xs font-medium text-gray-700 hover:bg-primary-100 hover:text-primary-700 transition-colors whitespace-nowrap"
               >
                 <span className="mr-1">{action.icon}</span>
                 {action.label}
@@ -359,20 +363,20 @@ export function SmartAssistant({
 
       {/* Escalate button */}
       {messages.length > 4 && (
-        <div className="px-4 py-2 border-t border-gray-100 bg-orange-50">
+        <div className="px-3 sm:px-4 py-2 border-t border-gray-100 bg-orange-50 shrink-0">
           <button
             onClick={handleEscalate}
-            className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100 rounded-lg transition-colors"
+            className="w-full flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-orange-700 hover:bg-orange-100 rounded-lg transition-colors"
           >
-            <MessageSquare size={16} className="mr-2" />
-            Parler à un conseiller humain
-            <ArrowRight size={14} className="ml-2" />
+            <MessageSquare size={14} className="mr-1.5 sm:mr-2 shrink-0" />
+            <span className="truncate">Parler à un conseiller humain</span>
+            <ArrowRight size={12} className="ml-1.5 sm:ml-2 shrink-0" />
           </button>
         </div>
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-200 bg-white">
+      <div className="p-3 sm:p-4 border-t border-gray-200 bg-white shrink-0">
         <div className="flex items-center space-x-2">
           <input
             ref={inputRef}
@@ -381,24 +385,25 @@ export function SmartAssistant({
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Posez votre question..."
-            className="flex-1 px-4 py-2.5 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all"
+            className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all"
             disabled={isLoading}
           />
           <button
             onClick={() => handleSend()}
             disabled={isLoading || !input.trim()}
             className={cn(
-              'p-2.5 rounded-full transition-all',
+              'p-2 sm:p-2.5 rounded-full transition-all shrink-0',
               input.trim()
                 ? 'bg-primary-600 text-white hover:bg-primary-700'
                 : 'bg-gray-200 text-gray-400'
             )}
           >
-            <Send size={18} />
+            <Send size={16} className="sm:hidden" />
+            <Send size={18} className="hidden sm:block" />
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2 text-center">
-          Propulsé par Google Gemini • Réponse instantanée 24/7
+        <p className="text-[10px] sm:text-xs text-gray-400 mt-2 text-center">
+          Lumo - Assistant IA KLY Groupe
         </p>
       </div>
     </div>
