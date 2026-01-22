@@ -2,7 +2,7 @@ import { GoogleGenerativeAI, ChatSession, Content } from '@google/generative-ai'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-// System prompt for Lumo - VERSION FINALE OPTIMISÉE
+// System prompt for Lumo - VERSION FINALE OPTIMISÉE AVEC SAGE
 const SYSTEM_PROMPT = `[IDENTITÉ]
 Je suis Lumo, assistant IA de KLY Groupe (équipements industriels).
 
@@ -13,22 +13,36 @@ Je suis Lumo, assistant IA de KLY Groupe (équipements industriels).
 - Emojis: 1-2 max par message
 
 [EXPERTISE]
-Je peux aider sur: questions générales, problèmes techniques, création de tickets SAV.
+Je peux aider sur: suivi commandes SAGE, problèmes techniques, création de tickets SAV.
 
-[⚠️ RÈGLE CRITIQUE - NE JAMAIS INVENTER]
-Je n'ai PAS accès aux données SAGE (commandes, factures, produits, prix, stocks).
-Si on me demande des infos sur:
-- Une référence produit → "Je n'ai pas accès au catalogue. Consultez votre espace client ou créez un ticket."
-- Une commande/facture → "Je ne peux pas consulter SAGE. Vérifiez dans 'Mes commandes' ou créez un ticket."
-- Un prix/stock → "Je n'ai pas cette information. Contactez notre équipe commerciale."
-
-Je ne dois JAMAIS inventer de références, prix, stocks ou statuts de commande.
+[DONNÉES SAGE]
+J'ai accès aux commandes du client (si fournies dans le contexte).
+Je peux répondre sur: numéros de commande, montants, statuts, dates, articles commandés.
+Si les données SAGE sont dans le contexte, je les utilise pour répondre précisément.
+Si une info n'est pas dans le contexte fourni, je dis honnêtement que je ne l'ai pas.
 
 [COMPORTEMENT]
 1. Je réponds de façon CONCISE et COMPLÈTE
-2. Je suis HONNÊTE sur mes limites
-3. Je propose des solutions concrètes (ticket SAV, espace client)
+2. J'utilise les VRAIES données SAGE si disponibles
+3. Je suis HONNÊTE si une info n'est pas disponible
 4. Je termine TOUJOURS mes réponses proprement`;
+
+// Interface pour le contexte SAGE
+interface SageContext {
+  orders?: Array<{
+    orderNumber: string;
+    status: string;
+    totalAmount?: number;
+    orderDate?: string;
+    items?: Array<{
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+    }>;
+  }>;
+  customerName?: string;
+  customerCode?: string;
+}
 
 // Knowledge base for common issues
 const KNOWLEDGE_BASE = {
@@ -249,6 +263,7 @@ class GeminiService {
     orderNumber?: string;
     productName?: string;
     previousIssues?: string[];
+    sageData?: SageContext;
   }): Promise<string> {
     // First, check knowledge base for quick answers (lowered threshold for better local matching)
     const diagnostic = this.analyzeIssue(userMessage);
@@ -271,10 +286,34 @@ class GeminiService {
     }
 
     try {
-      // Add context to the message
+      // Build enhanced message with SAGE context
       let enhancedMessage = userMessage;
-      if (context) {
-        enhancedMessage = `[Contexte: ${context.orderNumber ? `Commande: ${context.orderNumber}` : ''} ${context.productName ? `Produit: ${context.productName}` : ''}]\n\n${userMessage}`;
+
+      // Add SAGE data context if available
+      if (context?.sageData) {
+        const sageInfo: string[] = [];
+
+        if (context.sageData.customerName) {
+          sageInfo.push(`Client: ${context.sageData.customerName}`);
+        }
+
+        if (context.sageData.orders && context.sageData.orders.length > 0) {
+          sageInfo.push(`\n📦 COMMANDES DU CLIENT (${context.sageData.orders.length} commandes):`);
+          context.sageData.orders.slice(0, 10).forEach((order, i) => {
+            sageInfo.push(`${i + 1}. ${order.orderNumber} - ${order.status} - ${order.totalAmount?.toFixed(2) || '?'}€ - ${order.orderDate || 'date inconnue'}`);
+            if (order.items && order.items.length > 0) {
+              order.items.slice(0, 3).forEach(item => {
+                sageInfo.push(`   • ${item.productName} (x${item.quantity}) - ${item.unitPrice}€`);
+              });
+            }
+          });
+        }
+
+        if (sageInfo.length > 0) {
+          enhancedMessage = `[DONNÉES SAGE RÉELLES]\n${sageInfo.join('\n')}\n\n[QUESTION CLIENT]\n${userMessage}`;
+        }
+      } else if (context?.orderNumber) {
+        enhancedMessage = `[Contexte: Commande ${context.orderNumber}]\n\n${userMessage}`;
       }
 
       const result = await this.chatSession.sendMessage(enhancedMessage);
@@ -448,4 +487,4 @@ class GeminiService {
 
 export const geminiService = new GeminiService();
 export default geminiService;
-export type { ChatMessage, DiagnosticResult };
+export type { ChatMessage, DiagnosticResult, SageContext };

@@ -14,7 +14,9 @@ import {
   Lightbulb,
   ArrowRight
 } from 'lucide-react';
-import { geminiService, ChatMessage } from '@/services/geminiService';
+import { geminiService, ChatMessage, SageContext } from '@/services/geminiService';
+import { ordersApi } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
 
 interface SmartAssistantProps {
@@ -51,13 +53,47 @@ export function SmartAssistant({
   minimized = false,
   onToggleMinimize
 }: SmartAssistantProps) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [sageData, setSageData] = useState<SageContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load SAGE orders for context
+  useEffect(() => {
+    const loadSageData = async () => {
+      if (!user) return;
+      try {
+        const orders = await ordersApi.getAll(1, 20); // Get last 20 orders
+        setSageData({
+          customerName: user.displayName || user.email,
+          customerCode: user.customerCode,
+          orders: orders.map(o => ({
+            orderNumber: o.orderNumber,
+            status: o.status,
+            totalAmount: o.totalAmount,
+            orderDate: o.orderDate,
+            items: o.lines?.map(l => ({
+              productName: l.productName,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice
+            })) || o.items?.map(i => ({
+              productName: i.productName,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice
+            }))
+          }))
+        });
+      } catch (error) {
+        console.warn('Could not load SAGE data for Lumo:', error);
+      }
+    };
+    loadSageData();
+  }, [user]);
 
   // Initialize Gemini
   useEffect(() => {
@@ -108,7 +144,11 @@ export function SmartAssistant({
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const response = await geminiService.chat(messageText, orderContext);
+      // Pass SAGE data to Lumo for real data access
+      const response = await geminiService.chat(messageText, {
+        ...orderContext,
+        sageData: sageData || undefined
+      });
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
