@@ -56,6 +56,9 @@ enum TicketAction {
   UPDATED
   ASSIGNED
   UNASSIGNED
+  AUTO_ASSIGNED
+  TRANSFER_ACCEPTED
+  TRANSFER_DECLINED
   STATUS_CHANGED
   PRIORITY_CHANGED
   ESCALATED
@@ -109,6 +112,9 @@ model User {
 
   // Canned responses usage
   cannedResponsesUsed CannedResponseUse[]
+
+  // Automation rules created by this user
+  automationRulesCreated AutomationRule[] @relation("AutomationCreator")
 
   @@index([email])
   @@index([role])
@@ -194,6 +200,7 @@ model OrderLine {
 model Ticket {
   id           String         @id @default(cuid())
   ticketNumber Int            @unique @default(autoincrement())
+  ticketRef    String?        @unique // Format: 26-0001 (année-numéro séquentiel)
   title        String
   description  String?
   status       TicketStatus   @default(OPEN)
@@ -249,6 +256,7 @@ model Ticket {
   @@index([status, priority])
   @@index([slaDeadline])
   @@index([createdAt])
+  @@index([ticketRef])
 }
 
 // ============================================
@@ -408,4 +416,67 @@ model CannedResponseUse {
   @@index([ticketId])
   @@index([ticketId, createdAt])
   @@index([cannedResponseId])
+}
+
+// ============================================
+// MODEL: AUTOMATION RULE
+// ============================================
+
+enum AutomationTrigger {
+  TICKET_CREATED
+  TICKET_UPDATED
+  TICKET_STATUS_CHANGED
+  TICKET_RESOLVED
+  TICKET_CLOSED
+  TICKET_IDLE_4H
+  TICKET_WAITING_3DAYS
+  TICKET_RESOLVED_7DAYS
+  SLA_WARNING
+  SLA_BREACH
+}
+
+model AutomationRule {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  trigger     AutomationTrigger
+  conditions  Json               @default("[]")  // Array of condition objects
+  actions     Json               @default("[]")  // Array of action objects
+  isActive    Boolean            @default(true)
+  priority    Int                @default(0)     // For execution order
+
+  createdById String?
+  createdBy   User?              @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  // Execution logs
+  executions  AutomationExecution[]
+
+  @@index([isActive])
+  @@index([trigger])
+  @@index([createdAt])
+}
+
+// ============================================
+// MODEL: AUTOMATION EXECUTION
+// ============================================
+
+model AutomationExecution {
+  id        String          @id @default(cuid())
+  ruleId    String
+  rule      AutomationRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  ticketId  String?
+  success   Boolean         @default(true)
+  error     String?
+  details   Json?           // Additional execution details
+
+  executedAt DateTime       @default(now())
+
+  @@index([ruleId])
+  @@index([ticketId])
+  @@index([executedAt])
+  @@index([ruleId, executedAt])
 }

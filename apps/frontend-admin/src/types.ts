@@ -125,6 +125,7 @@ export interface TicketHistory {
 export interface Ticket {
   id: string;
   ticketNumber?: number;
+  ticketRef?: string; // Format: 26-0001 (année-numéro)
   title: string;
   description?: string;
   status: TicketStatus;
@@ -248,4 +249,67 @@ export interface CannedResponse {
   content: string;
   category: string;
   isActive: boolean;
+}
+
+// ============================================
+// ENUMS - Automation
+// ============================================
+
+export enum AutomationTrigger {
+  TICKET_CREATED = 'TICKET_CREATED',
+  TICKET_UPDATED = 'TICKET_UPDATED',
+  TICKET_STATUS_CHANGED = 'TICKET_STATUS_CHANGED',
+  TICKET_RESOLVED = 'TICKET_RESOLVED',
+  TICKET_CLOSED = 'TICKET_CLOSED',
+  TICKET_IDLE_4H = 'TICKET_IDLE_4H',
+  TICKET_WAITING_3DAYS = 'TICKET_WAITING_3DAYS',
+  TICKET_RESOLVED_7DAYS = 'TICKET_RESOLVED_7DAYS',
+  SLA_WARNING = 'SLA_WARNING',
+  SLA_BREACH = 'SLA_BREACH',
+}
+
+// ============================================
+// INTERFACES - Automation
+// ============================================
+
+export interface AutomationCondition {
+  field: string;
+  operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'in';
+  value: string | number | boolean | string[];
+}
+
+export interface AutomationAction {
+  type: string;
+  params?: Record<string, unknown>;
+}
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  description?: string;
+  trigger: AutomationTrigger;
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
+  isActive: boolean;
+  priority: number;
+  createdById?: string;
+  createdBy?: {
+    id: string;
+    displayName: string;
+    email: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    executions: number;
+  };
+}
+
+export interface AutomationStats {
+  totalRules: number;
+  activeRules: number;
+  todayExecutions: number;
+  weekExecutions: number;
+  autoAssignCount: number;
+  notificationCount: number;
 }

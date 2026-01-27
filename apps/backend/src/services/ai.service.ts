@@ -60,6 +60,7 @@ interface AIResponse {
   success: boolean;
   message: string;
   shouldEscalate: boolean;
+  shouldCloseTicket: boolean; // L'IA recommande de clôturer le ticket
   confidence: number;
   suggestedActions?: string[];
   offerHumanHelp: boolean; // Proposer de parler à un humain après 2 échanges
@@ -221,6 +222,9 @@ export const AIService = {
       // Analyser si on doit escalader
       const shouldEscalate = this.shouldEscalate(aiMessage, context);
 
+      // Analyser si on doit clôturer le ticket
+      const shouldCloseTicket = this.shouldCloseTicket(aiMessage, context);
+
       // Proposer un humain après 2 échanges client
       const customerMessages = context.conversationHistory.filter(m => m.role === 'customer').length;
       const offerHumanHelp = customerMessages >= 2;
@@ -229,6 +233,7 @@ export const AIService = {
         success: true,
         message: aiMessage,
         shouldEscalate,
+        shouldCloseTicket,
         confidence: shouldEscalate ? 60 : 85,
         suggestedActions: this.extractSuggestedActions(aiMessage),
         offerHumanHelp,
@@ -348,10 +353,14 @@ ${context.description ? `\nDESCRIPTION DU PROBLÈME:\n${context.description}` : 
       }
     }
 
+    // Vérifier si on doit clôturer
+    const shouldCloseTicket = this.shouldCloseTicket(message, context);
+
     return {
       success: true,
       message,
       shouldEscalate,
+      shouldCloseTicket,
       confidence: shouldEscalate ? 60 : 80,
       offerHumanHelp: customerMessages >= 1, // Proposer après le 2ème message (1 échange complet)
     };
@@ -380,6 +389,73 @@ ${context.description ? `\nDESCRIPTION DU PROBLÈME:\n${context.description}` : 
     }
 
     return false;
+  },
+
+  /**
+   * Détermine si on doit clôturer automatiquement le ticket
+   * L'IA détecte quand le client confirme que le problème est résolu
+   */
+  shouldCloseTicket(message: string, context: TicketContext): boolean {
+    // Récupérer le dernier message du client
+    const lastCustomerMessage = context.conversationHistory
+      .filter(m => m.role === 'customer')
+      .slice(-1)[0]?.content.toLowerCase() || '';
+
+    // Mots-clés indiquant une résolution confirmée par le client
+    const resolutionKeywords = [
+      'merci beaucoup',
+      'merci bien',
+      'problème résolu',
+      'ça marche',
+      'ça fonctionne',
+      'c\'est bon',
+      'c\'est réglé',
+      'tout est ok',
+      'tout fonctionne',
+      'parfait merci',
+      'super merci',
+      'génial',
+      'nickel',
+      'impeccable',
+      'résolu',
+      'corrigé',
+      'fixé',
+      'réparé',
+      'plus de problème',
+      'aucun problème',
+      'très bien merci',
+      'exactement ce qu\'il fallait',
+      'vous pouvez clôturer',
+      'vous pouvez fermer',
+      'on peut fermer',
+      'ticket peut être fermé',
+    ];
+
+    // Vérifier si le client a confirmé la résolution
+    const hasResolutionKeyword = resolutionKeywords.some(kw => lastCustomerMessage.includes(kw));
+
+    // Patterns plus flexibles
+    const resolutionPatterns = [
+      /merci.*(résolu|fonctionn|marche|ok|bien)/i,
+      /(c'est|tout est).*(bon|ok|réglé|parfait)/i,
+      /(problème|souci|bug).*(résolu|corrigé|fixé|plus)/i,
+      /plus.*(problème|souci|bug)/i,
+      /(ça|cela).*(marche|fonctionne|va)/i,
+    ];
+
+    const matchesPattern = resolutionPatterns.some(pattern => pattern.test(lastCustomerMessage));
+
+    // Si le client confirme la résolution ET qu'il y a eu au moins 2 échanges
+    const hasEnoughExchanges = context.conversationHistory.filter(m => m.role === 'customer').length >= 2;
+
+    // Vérifier aussi la réponse de l'IA pour des indices de clôture
+    const aiResponseLower = message.toLowerCase();
+    const aiSuggestsClosing = aiResponseLower.includes('clôtur') ||
+                              aiResponseLower.includes('résolu') ||
+                              aiResponseLower.includes('ravi d\'avoir pu vous aider') ||
+                              aiResponseLower.includes('bonne journée');
+
+    return (hasResolutionKeyword || matchesPattern) && (hasEnoughExchanges || aiSuggestsClosing);
   },
 
   /**

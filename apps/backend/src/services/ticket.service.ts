@@ -9,10 +9,38 @@ import {
 } from './notification.service.js';
 import { AIService } from './ai.service.js';
 import { broadcastAITyping, broadcastNewMessage } from '../websocket/index.js';
+import { AutomationEngine } from './automation.service.js';
 
 // ============================================
 // SERVICE DE GESTION DES TICKETS
 // ============================================
+
+/**
+ * Génère le ticketRef au format YY-XXXX (ex: 26-0001)
+ * YY = année sur 2 chiffres
+ * XXXX = numéro séquentiel dans l'année (avec padding de zéros)
+ */
+async function generateTicketRef(ticketNumber: number): Promise<string> {
+  const year = new Date().getFullYear().toString().slice(-2); // "26" pour 2026
+
+  // Trouver le prochain numéro séquentiel pour cette année
+  const yearPrefix = `${year}-`;
+
+  // Compter les tickets de cette année pour obtenir le bon numéro
+  const ticketsThisYear = await prisma.ticket.count({
+    where: {
+      ticketRef: { startsWith: yearPrefix },
+    },
+  });
+
+  // Le numéro séquentiel est le nombre de tickets + 1 (car celui-ci n'a pas encore de ref)
+  const sequenceNumber = ticketsThisYear + 1;
+
+  // Formatter avec padding (4 chiffres minimum)
+  const paddedNumber = sequenceNumber.toString().padStart(4, '0');
+
+  return `${year}-${paddedNumber}`;
+}
 
 /**
  * Trouve l'agent le moins chargé pour auto-assignation
@@ -108,7 +136,7 @@ export async function createTicket(
     // Si pas trouvé, c'est probablement un numéro SAGE - on ne l'utilise pas comme FK
   }
 
-  const ticket = await prisma.ticket.create({
+  let ticket = await prisma.ticket.create({
     data: {
       customerId,
       orderId: validOrderId,
@@ -129,6 +157,17 @@ export async function createTicket(
       equipmentBrand: data.equipmentBrand,
       errorCode: data.errorCode,
     },
+    include: {
+      order: true,
+      attachments: true,
+    },
+  });
+
+  // Générer et assigner le ticketRef au format YY-XXXX
+  const ticketRef = await generateTicketRef(ticket.ticketNumber);
+  ticket = await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: { ticketRef },
     include: {
       order: true,
       attachments: true,
@@ -199,6 +238,14 @@ export async function createTicket(
   // L'IA commence la conversation immédiatement
   triggerAIWelcome(ticket.id).catch(err => {
     console.error('[AI Welcome] Erreur:', err);
+  });
+
+  // ============================================
+  // AUTOMATISATION - DÉCLENCHEMENT RÈGLES
+  // ============================================
+  // Exécuter les règles d'automatisation pour la création de ticket
+  AutomationEngine.processRules('TICKET_CREATED', ticket).catch(err => {
+    console.error('[Automation] Erreur lors du traitement des règles:', err);
   });
 
   return ticket;
@@ -575,6 +622,36 @@ export async function updateTicket(
           content: `Votre ticket "${ticket.title}" a été marqué comme urgent.`,
           newPriority: data.priority,
         },
+      });
+    }
+  }
+
+  // ============================================
+  // DÉCLENCHEURS D'AUTOMATISATION
+  // ============================================
+
+  // Déclencher pour toute mise à jour
+  AutomationEngine.processRules('TICKET_UPDATED', updatedTicket).catch(err => {
+    console.error('[Automation] Erreur TICKET_UPDATED:', err);
+  });
+
+  // Déclencher pour changement de statut
+  if (data.status && data.status !== ticket.status) {
+    AutomationEngine.processRules('TICKET_STATUS_CHANGED', updatedTicket).catch(err => {
+      console.error('[Automation] Erreur TICKET_STATUS_CHANGED:', err);
+    });
+
+    // Déclencher pour résolution
+    if (data.status === 'RESOLVED') {
+      AutomationEngine.processRules('TICKET_RESOLVED', updatedTicket).catch(err => {
+        console.error('[Automation] Erreur TICKET_RESOLVED:', err);
+      });
+    }
+
+    // Déclencher pour fermeture
+    if (data.status === 'CLOSED') {
+      AutomationEngine.processRules('TICKET_CLOSED', updatedTicket).catch(err => {
+        console.error('[Automation] Erreur TICKET_CLOSED:', err);
       });
     }
   }

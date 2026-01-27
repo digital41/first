@@ -8,6 +8,7 @@ import * as slaController from '../controllers/sla.controller.js';
 import * as cannedResponseController from '../controllers/canned-response.controller.js';
 import * as uploadController from '../controllers/upload.controller.js';
 import * as aiController from '../controllers/ai.controller.js';
+import * as automationController from '../controllers/automation.controller.js';
 import { upload } from '../config/multer.js';
 
 // ============================================
@@ -174,5 +175,33 @@ router.post('/ai/summary/:ticketId', aiController.getConversationSummary as unkn
 
 // Chat avec l'assistant IA global
 router.post('/ai/chat', aiController.chatWithGlobalAssistant as unknown as RequestHandler);
+
+// ============================================
+// AUTOMATISATION
+// ============================================
+
+// Statistiques d'automatisation
+router.get('/automation/stats', automationController.getStats as unknown as RequestHandler);
+
+// Historique des exécutions
+router.get('/automation/history', automationController.getExecutionHistory as unknown as RequestHandler);
+
+// Liste des règles d'automatisation
+router.get('/automation/rules', automationController.listRules as unknown as RequestHandler);
+
+// Créer une règle (Admin/Supervisor uniquement)
+router.post('/automation/rules', requireStaff as unknown as RequestHandler, automationController.createRule as unknown as RequestHandler);
+
+// Obtenir une règle
+router.get('/automation/rules/:id', automationController.getRule as unknown as RequestHandler);
+
+// Mettre à jour une règle (Admin/Supervisor uniquement)
+router.put('/automation/rules/:id', requireStaff as unknown as RequestHandler, automationController.updateRule as unknown as RequestHandler);
+
+// Supprimer une règle (Admin uniquement)
+router.delete('/automation/rules/:id', adminOnly, automationController.deleteRule as unknown as RequestHandler);
+
+// Activer/Désactiver une règle
+router.put('/automation/rules/:id/toggle', requireStaff as unknown as RequestHandler, automationController.toggleRule as unknown as RequestHandler);
 
 export default router;

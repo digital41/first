@@ -27,7 +27,7 @@ export function TicketCard({ ticket, variant = 'default' }: TicketCardProps) {
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-primary-600">
-              {formatTicketNumber(ticket.ticketNumber)}
+              {formatTicketNumber(ticket.ticketRef || ticket.ticketNumber)}
             </span>
             {unreadCount > 0 && (
               <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
@@ -55,7 +55,7 @@ export function TicketCard({ ticket, variant = 'default' }: TicketCardProps) {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-primary-600">
-              {formatTicketNumber(ticket.ticketNumber)}
+              {formatTicketNumber(ticket.ticketRef || ticket.ticketNumber)}
             </span>
             {unreadCount > 0 && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">

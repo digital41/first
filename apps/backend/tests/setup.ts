@@ -18,6 +18,7 @@ vi.mock('../src/config/database.js', () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      count: vi.fn(),
     },
     ticket: {
       findUnique: vi.fn(),
@@ -27,24 +28,51 @@ vi.mock('../src/config/database.js', () => ({
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(),
     },
     order: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
     },
-    $transaction: vi.fn((callback) => callback({
-      user: {
-        findUnique: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-      },
-      ticket: {
-        findUnique: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-      },
-    })),
+    notification: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      count: vi.fn(),
+    },
+    ticketHistory: {
+      create: vi.fn(),
+      createMany: vi.fn(),
+      findMany: vi.fn(),
+    },
+    chatMessage: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    $transaction: vi.fn((ops) => {
+      if (Array.isArray(ops)) {
+        return Promise.all(ops);
+      }
+      return ops({
+        user: {
+          findUnique: vi.fn(),
+          create: vi.fn(),
+          update: vi.fn(),
+        },
+        ticket: {
+          findUnique: vi.fn(),
+          create: vi.fn(),
+          update: vi.fn(),
+        },
+        ticketHistory: {
+          create: vi.fn(),
+          createMany: vi.fn(),
+        },
+      });
+    }),
   },
 }));
 

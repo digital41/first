@@ -11,6 +11,7 @@ import {
   UpdateTicketPayload,
   CannedResponse,
   Attachment,
+  AutomationRule,
 } from '../types';
 
 // ============================================
@@ -1048,6 +1049,125 @@ export const AdminApi = {
       body: JSON.stringify({ message, conversationHistory }),
     });
     return response;
+  },
+
+  // ==========================================
+  // AUTOMATION RULES
+  // ==========================================
+
+  /**
+   * Get automation statistics
+   */
+  async getAutomationStats(): Promise<{
+    totalRules: number;
+    activeRules: number;
+    todayExecutions: number;
+    weekExecutions: number;
+    autoAssignCount: number;
+    notificationCount: number;
+  }> {
+    return fetchWithAuth('/admin/automation/stats');
+  },
+
+  /**
+   * Get all automation rules
+   */
+  async getAutomationRules(includeInactive = true): Promise<AutomationRule[]> {
+    const response = await fetchWithAuth<AutomationRule[]>(
+      `/admin/automation/rules?includeInactive=${includeInactive}`
+    );
+    return response || [];
+  },
+
+  /**
+   * Get a single automation rule
+   */
+  async getAutomationRule(id: string): Promise<AutomationRule> {
+    return fetchWithAuth(`/admin/automation/rules/${id}`);
+  },
+
+  /**
+   * Create a new automation rule
+   */
+  async createAutomationRule(data: {
+    name: string;
+    description?: string;
+    trigger: string;
+    conditions: Array<{ field: string; operator: string; value: unknown }>;
+    actions: Array<{ type: string; params?: Record<string, unknown> }>;
+    isActive?: boolean;
+    priority?: number;
+  }): Promise<AutomationRule> {
+    return fetchWithAuth('/admin/automation/rules', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update an automation rule
+   */
+  async updateAutomationRule(
+    id: string,
+    data: Partial<{
+      name: string;
+      description: string;
+      trigger: string;
+      conditions: Array<{ field: string; operator: string; value: unknown }>;
+      actions: Array<{ type: string; params?: Record<string, unknown> }>;
+      isActive: boolean;
+      priority: number;
+    }>
+  ): Promise<AutomationRule> {
+    return fetchWithAuth(`/admin/automation/rules/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete an automation rule
+   */
+  async deleteAutomationRule(id: string): Promise<void> {
+    await fetchWithAuth(`/admin/automation/rules/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Toggle automation rule active status
+   */
+  async toggleAutomationRule(id: string): Promise<AutomationRule> {
+    return fetchWithAuth(`/admin/automation/rules/${id}/toggle`, {
+      method: 'PUT',
+    });
+  },
+
+  /**
+   * Get automation execution history
+   */
+  async getAutomationHistory(options?: {
+    ruleId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    data: Array<{
+      id: string;
+      ruleId: string;
+      ticketId: string | null;
+      success: boolean;
+      error: string | null;
+      executedAt: string;
+      rule: { id: string; name: string; trigger: string };
+    }>;
+    meta: { total: number; limit: number; offset: number };
+  }> {
+    const params = new URLSearchParams();
+    if (options?.ruleId) params.set('ruleId', options.ruleId);
+    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.offset) params.set('offset', options.offset.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return fetchWithAuth(`/admin/automation/history${query}`);
   },
 };
 

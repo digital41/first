@@ -397,6 +397,38 @@ async function triggerAIResponse(ticketId: string): Promise<void> {
       }
     }
 
+    // ============================================
+    // CLÔTURE AUTOMATIQUE DU TICKET PAR L'IA
+    // ============================================
+    if (response.shouldCloseTicket) {
+      console.log(`[AI] Clôture automatique du ticket #${context.ticketNumber} - Le client a confirmé la résolution`);
+
+      // Mettre à jour le statut du ticket
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: {
+          status: 'RESOLVED',
+          resolvedAt: new Date(),
+        },
+      });
+
+      // Notifier via WebSocket
+      broadcastTicketUpdate(ticketId, 'status', 'RESOLVED');
+
+      // Ajouter une entrée dans l'historique
+      await prisma.ticketHistory.create({
+        data: {
+          ticketId,
+          action: 'STATUS_CHANGED',
+          field: 'status',
+          oldValue: context.status,
+          newValue: 'RESOLVED',
+        },
+      });
+
+      console.log(`[AI] Ticket #${context.ticketNumber} clôturé automatiquement`);
+    }
+
   } catch (error) {
     // S'assurer que l'indicateur de frappe est arrêté en cas d'erreur
     broadcastAITyping(ticketId, false);

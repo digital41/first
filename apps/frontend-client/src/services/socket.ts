@@ -118,10 +118,17 @@ class SocketService {
     this.pendingRooms.add(ticketId);
 
     if (this.socket?.connected) {
-      this.socket.emit('join:ticket', { ticketId });
-      console.log(`[Socket] Joined room ticket:${ticketId}`);
+      // Utiliser callback pour confirmation
+      this.socket.emit('join:ticket', { ticketId }, (response: { success: boolean }) => {
+        if (response?.success) {
+          console.log(`[Socket] Confirmed joined room ticket:${ticketId}`);
+        }
+      });
+      console.log(`[Socket] Joining room ticket:${ticketId}...`);
     } else {
       console.log(`[Socket] Room ticket:${ticketId} queued (waiting for connection)`);
+      // Forcer la reconnexion si pas connecté
+      this.connect();
     }
   }
 

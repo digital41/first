@@ -159,15 +159,31 @@ export function TicketDetailPage() {
       }
     };
 
+    // Quand on rejoint la room, refetch les messages pour rattraper ceux manqués
+    const handleRoomJoined = async (data: unknown) => {
+      const roomData = data as { ticketId: string };
+      if (roomData.ticketId === id) {
+        console.log('[TicketDetail] Room joined confirmed, refetching messages...');
+        try {
+          const freshMessages = await messagesApi.getByTicketId(id);
+          setMessages((freshMessages || []).filter((m: TicketMessage) => !m.isInternal));
+        } catch (error) {
+          console.error('[TicketDetail] Error refetching messages:', error);
+        }
+      }
+    };
+
     socketService.on('message:new', handleNewMessage);
     socketService.on('ticket:updated', handleTicketUpdate);
     socketService.on('ai:typing', handleAITyping);
+    socketService.on('room:joined', handleRoomJoined);
 
     return () => {
       socketService.leaveTicketRoom(id);
       socketService.off('message:new', handleNewMessage);
       socketService.off('ticket:updated', handleTicketUpdate);
       socketService.off('ai:typing', handleAITyping);
+      socketService.off('room:joined', handleRoomJoined);
     };
   }, [id]);
 
@@ -175,6 +191,35 @@ export function TicketDetailPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isAITyping]);
+
+  // Fallback: refetch messages when AI finishes typing (in case WebSocket message was missed)
+  const prevAITypingRef = useRef(isAITyping);
+  useEffect(() => {
+    const wasTyping = prevAITypingRef.current;
+    prevAITypingRef.current = isAITyping;
+
+    // Si l'IA vient de finir de taper, refetch les messages après un court délai
+    if (wasTyping && !isAITyping && id) {
+      const timer = setTimeout(async () => {
+        console.log('[TicketDetail] AI finished typing, refetching messages as fallback...');
+        try {
+          const freshMessages = await messagesApi.getByTicketId(id);
+          setMessages((prev) => {
+            const fresh = (freshMessages || []).filter((m: TicketMessage) => !m.isInternal);
+            // Ne mettre à jour que si on a plus de messages (évite de remplacer par moins)
+            if (fresh.length > prev.length) {
+              return fresh;
+            }
+            return prev;
+          });
+        } catch (error) {
+          console.error('[TicketDetail] Error refetching messages:', error);
+        }
+      }, 500); // Petit délai pour laisser le temps au message d'arriver par WebSocket
+
+      return () => clearTimeout(timer);
+    }
+  }, [isAITyping, id]);
 
   // Clear success message
   useEffect(() => {
@@ -314,7 +359,7 @@ export function TicketDetailPage() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm font-medium text-primary-600">
-                {formatTicketNumber(ticket.ticketNumber)}
+                {formatTicketNumber(ticket.ticketRef || ticket.ticketNumber)}
               </span>
               <StatusBadge status={ticket.status} />
               <PriorityBadge priority={ticket.priority} />
@@ -585,7 +630,15 @@ export function TicketDetailPage() {
                   <textarea
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Écrivez votre message..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (newMessage.trim() || files.length > 0) {
+                          handleSendMessage(e);
+                        }
+                      }
+                    }}
+                    placeholder="Écrivez votre message... (Entrée pour envoyer, Shift+Entrée pour nouvelle ligne)"
                     className="input min-h-[80px] resize-none"
                     disabled={isSending}
                   />

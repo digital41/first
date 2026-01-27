@@ -279,7 +279,7 @@ export function TicketsListPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-primary-600">
-                          {formatTicketNumber(ticket.ticketNumber)}
+                          {formatTicketNumber(ticket.ticketRef || ticket.ticketNumber)}
                         </span>
                         {unreadCount > 0 && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
@@ -306,7 +306,7 @@ export function TicketsListPage() {
                   <div className="col-span-4">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-primary-600">
-                        {formatTicketNumber(ticket.ticketNumber)}
+                        {formatTicketNumber(ticket.ticketRef || ticket.ticketNumber)}
                       </span>
                       {unreadCount > 0 && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">

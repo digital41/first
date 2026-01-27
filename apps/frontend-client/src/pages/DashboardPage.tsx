@@ -179,7 +179,7 @@ export function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-1">
                           <span className="text-sm font-medium text-primary-600">
-                            {formatTicketNumber(ticket.ticketNumber)}
+                            {formatTicketNumber(ticket.ticketRef || ticket.ticketNumber)}
                           </span>
                           {unreadCount > 0 && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">

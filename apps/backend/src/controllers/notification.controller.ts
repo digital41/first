@@ -64,7 +64,12 @@ export async function getNotifications(
     });
   } catch (error) {
     console.error('[Get Notifications Error]', error);
-    res.status(500).json({ success: false, error: 'Erreur serveur' });
+    const errorMessage = error instanceof Error ? error.message : 'Erreur serveur';
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+      details: error instanceof Error ? error.name : undefined
+    });
   }
 }
 

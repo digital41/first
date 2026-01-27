@@ -74,10 +74,16 @@ export function initializeSocket(httpServer: HTTPServer): typeof io {
     // ─────────────────────────────────────────
     // TICKET ROOM (alias pour frontend)
     // ─────────────────────────────────────────
-    authSocket.on('join:ticket', async (data: { ticketId: string }) => {
+    authSocket.on('join:ticket', async (data: { ticketId: string }, callback?: (response: { success: boolean }) => void) => {
       const room = `ticket:${data.ticketId}`;
       await authSocket.join(room);
       console.log(`[Socket] ${authSocket.userDisplayName} joined ${room}`);
+      // Envoyer confirmation au client via callback
+      if (typeof callback === 'function') {
+        callback({ success: true });
+      }
+      // Aussi émettre un événement pour confirmer
+      authSocket.emit('room:joined', { ticketId: data.ticketId, room });
     });
 
     authSocket.on('leave:ticket', async (data: { ticketId: string }) => {

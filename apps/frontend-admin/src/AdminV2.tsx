@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo, createContext, useContext, useRef, useCallback } from 'react';
 import {
   LayoutDashboard, Ticket as TicketIcon, Users, Settings, Bell, Search, Plus, Eye, Edit3,
-  Trash2, CheckCircle, Clock, AlertTriangle, XCircle, ChevronRight,
+  Trash2, CheckCircle, Clock, AlertTriangle, XCircle, ChevronRight, ChevronDown,
   Calendar, Wrench, FileText, BarChart3,
   Building2, Phone, Mail, User, LogOut, Menu, X, RefreshCw, Download, Upload,
   MessageSquare, Send, Paperclip, Zap, Filter,
@@ -87,16 +87,8 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: React.Re
 };
 
 // ============================================
-// DONNÉES MOCKÉES
+// TEMPLATES D'AUTOMATISATION
 // ============================================
-
-const mockAutomationRules: AutomationRule[] = [
-  { id: '1', name: 'Auto-assignation urgences', trigger: 'ticket.created', conditions: ['priority = URGENT'], actions: ['assign.least_workload', 'notify.supervisor'], isActive: true },
-  { id: '2', name: 'Escalade SLA', trigger: 'sla.warning', conditions: ['sla.remaining < 2h'], actions: ['escalate', 'notify.team'], isActive: true },
-  { id: '3', name: 'Clôture auto', trigger: 'ticket.resolved', conditions: ['no_response.7days'], actions: ['close', 'send.survey'], isActive: true },
-  { id: '4', name: 'Notification nouveau ticket', trigger: 'ticket.created', conditions: ['priority = HIGH'], actions: ['notify.assigned', 'notify.supervisor'], isActive: true },
-  { id: '5', name: 'Rappel ticket en attente', trigger: 'ticket.waiting.3days', conditions: ['status = WAITING_CUSTOMER'], actions: ['send.reminder', 'notify.agent'], isActive: false },
-];
 
 const AUTOMATION_TEMPLATES = [
   { id: 'tpl1', name: 'Auto-assignation par compétence', description: 'Assigne automatiquement les tickets techniques aux agents techniques', trigger: 'ticket.created', conditions: ['issueType = TECHNICAL'], actions: ['assign.by_skill'] },
@@ -469,6 +461,163 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 const useAuth = () => { const c = useContext(AuthContext); if (!c) throw new Error('useAuth error'); return c; };
 
+// Types pour les paramètres d'application
+type AppLanguage = 'fr' | 'en';
+type AppTheme = 'classic' | 'blue' | 'green';
+
+// Système de traduction
+const TRANSLATIONS: Record<AppLanguage, Record<string, string>> = {
+  fr: {
+    // Sidebar
+    'sidebar.dashboard': 'Vue d\'ensemble',
+    'sidebar.tickets': 'TICKETS',
+    'sidebar.allTickets': 'Tous les tickets',
+    'sidebar.openTickets': 'Tickets ouverts',
+    'sidebar.closedTickets': 'Tickets fermés',
+    'sidebar.clients': 'CLIENTS',
+    'sidebar.clientsList': 'Liste des clients',
+    'sidebar.admin': 'ADMINISTRATION',
+    'sidebar.users': 'Utilisateurs',
+    'sidebar.automation': 'Automatisation',
+    'sidebar.analytics': 'Analytics',
+    'sidebar.settings': 'Paramètres',
+    // Dashboard
+    'dashboard.title': 'Tableau de bord',
+    'dashboard.welcome': 'Bienvenue',
+    'dashboard.totalTickets': 'Total tickets',
+    'dashboard.openTickets': 'Tickets ouverts',
+    'dashboard.resolvedTickets': 'Tickets résolus',
+    'dashboard.avgResolution': 'Temps moyen',
+    // Tickets
+    'tickets.title': 'Gestion des tickets',
+    'tickets.new': 'Nouveau ticket',
+    'tickets.search': 'Rechercher...',
+    'tickets.status': 'Statut',
+    'tickets.priority': 'Priorité',
+    'tickets.assignedTo': 'Assigné à',
+    'tickets.created': 'Créé le',
+    'tickets.updated': 'Mis à jour',
+    // Settings
+    'settings.title': 'Paramètres',
+    'settings.general': 'Général',
+    'settings.language': 'Langue de l\'interface',
+    'settings.languageDesc': 'Sélectionnez la langue d\'affichage',
+    'settings.theme': 'Thème de couleur',
+    'settings.themeDesc': 'Personnalisez l\'apparence de la sidebar',
+    'settings.company': 'Informations entreprise',
+    'settings.companyName': 'Nom de l\'entreprise',
+    // Common
+    'common.save': 'Enregistrer',
+    'common.cancel': 'Annuler',
+    'common.delete': 'Supprimer',
+    'common.edit': 'Modifier',
+    'common.close': 'Fermer',
+    'common.loading': 'Chargement...',
+    'common.noData': 'Aucune donnée',
+  },
+  en: {
+    // Sidebar
+    'sidebar.dashboard': 'Overview',
+    'sidebar.tickets': 'TICKETS',
+    'sidebar.allTickets': 'All tickets',
+    'sidebar.openTickets': 'Open tickets',
+    'sidebar.closedTickets': 'Closed tickets',
+    'sidebar.clients': 'CLIENTS',
+    'sidebar.clientsList': 'Client list',
+    'sidebar.admin': 'ADMINISTRATION',
+    'sidebar.users': 'Users',
+    'sidebar.automation': 'Automation',
+    'sidebar.analytics': 'Analytics',
+    'sidebar.settings': 'Settings',
+    // Dashboard
+    'dashboard.title': 'Dashboard',
+    'dashboard.welcome': 'Welcome',
+    'dashboard.totalTickets': 'Total tickets',
+    'dashboard.openTickets': 'Open tickets',
+    'dashboard.resolvedTickets': 'Resolved tickets',
+    'dashboard.avgResolution': 'Avg time',
+    // Tickets
+    'tickets.title': 'Ticket management',
+    'tickets.new': 'New ticket',
+    'tickets.search': 'Search...',
+    'tickets.status': 'Status',
+    'tickets.priority': 'Priority',
+    'tickets.assignedTo': 'Assigned to',
+    'tickets.created': 'Created',
+    'tickets.updated': 'Updated',
+    // Settings
+    'settings.title': 'Settings',
+    'settings.general': 'General',
+    'settings.language': 'Interface language',
+    'settings.languageDesc': 'Select display language',
+    'settings.theme': 'Color theme',
+    'settings.themeDesc': 'Customize sidebar appearance',
+    'settings.company': 'Company info',
+    'settings.companyName': 'Company name',
+    // Common
+    'common.save': 'Save',
+    'common.cancel': 'Cancel',
+    'common.delete': 'Delete',
+    'common.edit': 'Edit',
+    'common.close': 'Close',
+    'common.loading': 'Loading...',
+    'common.noData': 'No data',
+  },
+};
+
+// Theme styles with CSS values for runtime application - Couleurs SAV Pro
+const THEME_STYLES: Record<AppTheme, {
+  name: string;
+  description: string;
+  sidebarBg: string;
+  logoBg: string;
+  activeBg: string;
+  accentColor: string;
+  accentHover: string;
+  borderColor: string;
+  hoverBg: string;
+  textMuted: string;
+  isLight?: boolean; // Pour les thèmes clairs (texte sombre)
+}> = {
+  classic: {
+    name: 'Classique Clair',
+    description: 'Style épuré et lumineux',
+    sidebarBg: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%)',
+    logoBg: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    activeBg: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)',
+    accentColor: '#3b82f6',
+    accentHover: '#2563eb',
+    borderColor: 'rgba(226, 232, 240, 1)',
+    hoverBg: 'rgba(241, 245, 249, 1)',
+    textMuted: 'rgba(100, 116, 139, 1)',
+    isLight: true,
+  },
+  blue: {
+    name: 'Bleu Professionnel',
+    description: 'Style classique et fiable',
+    sidebarBg: 'linear-gradient(180deg, #1e293b 0%, #0f172a 50%, #0c1426 100%)',
+    logoBg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    activeBg: 'linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%)',
+    accentColor: '#60a5fa',
+    accentHover: '#93c5fd',
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    hoverBg: 'rgba(37, 99, 235, 0.2)',
+    textMuted: 'rgba(148, 163, 184, 0.7)',
+  },
+  green: {
+    name: 'Turquoise Frais',
+    description: 'Style moderne et dynamique',
+    sidebarBg: '#115e59',
+    logoBg: '#14b8a6',
+    activeBg: '#0d9488',
+    accentColor: '#5eead4',
+    accentHover: '#99f6e4',
+    borderColor: 'rgba(94, 234, 212, 0.25)',
+    hoverBg: 'rgba(20, 184, 166, 0.25)',
+    textMuted: 'rgba(167, 243, 208, 0.85)',
+  },
+};
+
 interface AdminContextType {
   currentView: string;
   setCurrentView: (v: string) => void;
@@ -476,6 +625,8 @@ interface AdminContextType {
   setSelectedTicket: (t: Ticket | null) => void;
   sidebarOpen: boolean;
   setSidebarOpen: (o: boolean) => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (c: boolean) => void;
   notifications: NotificationType[];
   unreadNotifications: number;
   unreadByTicket: Map<string, number>;
@@ -493,6 +644,13 @@ interface AdminContextType {
   refreshData: () => Promise<void>;
   isLoading: boolean;
   autoAssignTickets: () => Promise<void>;
+  // App settings
+  appTheme: AppTheme;
+  setAppTheme: (t: AppTheme) => void;
+  appLanguage: AppLanguage;
+  setAppLanguage: (l: AppLanguage) => void;
+  // Translation function
+  t: (key: string) => string;
 }
 const AdminContext = createContext<AdminContextType | null>(null);
 const useAdmin = () => { const c = useContext(AdminContext); if (!c) throw new Error('useAdmin error'); return c; };
@@ -560,10 +718,11 @@ const Textarea: React.FC<{
   placeholder?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   rows?: number;
   className?: string;
-}> = ({ placeholder, value, onChange, rows = 3, className = '' }) => (
-  <textarea placeholder={placeholder} value={value} onChange={onChange} rows={rows}
+}> = ({ placeholder, value, onChange, onKeyDown, rows = 3, className = '' }) => (
+  <textarea placeholder={placeholder} value={value} onChange={onChange} onKeyDown={onKeyDown} rows={rows}
     className={`block w-full rounded-lg border border-gray-300 bg-white py-2.5 px-4 text-sm placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none transition-all duration-200 ${className}`} />
 );
 
@@ -611,8 +770,8 @@ const Tabs: React.FC<{
   activeTab: string;
   onChange: (id: string) => void;
 }> = ({ tabs, activeTab, onChange }) => (
-  <div className="border-b border-gray-200">
-    <nav className="flex space-x-1 px-1">
+  <div className="border-b border-gray-200 overflow-x-auto">
+    <nav className="flex space-x-1 px-1 min-w-max">
       {tabs.map(t => (
         <button key={t.id} onClick={() => onChange(t.id)}
           className={`flex items-center gap-2 py-3 px-4 border-b-2 text-sm font-medium transition-all duration-200 ${activeTab === t.id ? 'border-blue-500 text-blue-600 bg-blue-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'} rounded-t-lg`}>
@@ -657,6 +816,199 @@ const KPICard: React.FC<{
         {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
       </div>
     </Card>
+  );
+};
+
+// ============================================
+// CHART COMPONENTS - Data Visualization
+// ============================================
+
+// Donut Chart Component
+const DonutChart: React.FC<{
+  data: { label: string; value: number; color: string }[];
+  size?: number;
+  thickness?: number;
+  showLegend?: boolean;
+  centerLabel?: string;
+  centerValue?: string | number;
+}> = ({ data, size = 180, thickness = 35, showLegend = true, centerLabel, centerValue }) => {
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  let currentOffset = 0;
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="transform -rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={thickness} />
+          {data.map((segment, i) => {
+            const percentage = total > 0 ? segment.value / total : 0;
+            const strokeLength = percentage * circumference;
+            const offset = currentOffset;
+            currentOffset += strokeLength;
+            return (
+              <circle
+                key={i}
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={segment.color}
+                strokeWidth={thickness}
+                strokeDasharray={`${strokeLength} ${circumference - strokeLength}`}
+                strokeDashoffset={-offset}
+                className="transition-all duration-700 ease-out"
+              />
+            );
+          })}
+        </svg>
+        {(centerLabel || centerValue !== undefined) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            {centerValue !== undefined && <span className="text-2xl font-bold text-gray-900">{centerValue}</span>}
+            {centerLabel && <span className="text-xs text-gray-500">{centerLabel}</span>}
+          </div>
+        )}
+      </div>
+      {showLegend && (
+        <div className="flex flex-wrap justify-center gap-2">
+          {data.filter(d => d.value > 0).map((segment, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-xs">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: segment.color }} />
+              <span className="text-gray-600">{segment.label}</span>
+              <span className="font-semibold">{segment.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Area Line Chart Component
+const AreaLineChart: React.FC<{
+  data: { label: string; value: number }[];
+  width?: number;
+  height?: number;
+  color?: string;
+  gradientId?: string;
+}> = ({ data, width = 350, height = 180, color = '#3b82f6', gradientId = 'areaGradient' }) => {
+  if (data.length < 2) return <div className="text-gray-400 text-sm text-center py-8">Données insuffisantes</div>;
+
+  const padding = { top: 20, right: 10, bottom: 35, left: 35 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+  const maxVal = Math.max(...data.map(d => d.value), 1);
+
+  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartW;
+  const getY = (v: number) => padding.top + chartH - (v / maxVal) * chartH;
+
+  const linePath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.value)}`).join(' ');
+  const areaPath = `${linePath} L ${getX(data.length - 1)} ${padding.top + chartH} L ${padding.left} ${padding.top + chartH} Z`;
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+          <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+      {[0, 0.5, 1].map((r, i) => (
+        <g key={i}>
+          <line x1={padding.left} y1={getY(maxVal * r)} x2={width - padding.right} y2={getY(maxVal * r)} stroke="#e5e7eb" strokeDasharray={r === 0 ? "0" : "3,3"} />
+          <text x={padding.left - 5} y={getY(maxVal * r) + 4} textAnchor="end" className="text-[10px] fill-gray-400">{Math.round(maxVal * r)}</text>
+        </g>
+      ))}
+      <path d={areaPath} fill={`url(#${gradientId})`} />
+      <path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={getX(i)} cy={getY(d.value)} r={4} fill="white" stroke={color} strokeWidth={2} className="transition-all" />
+          <text x={getX(i)} y={height - 8} textAnchor="middle" className="text-[9px] fill-gray-500">{d.label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+// Vertical Bar Chart Component
+const VerticalBarChart: React.FC<{
+  data: { label: string; value: number; color: string }[];
+  width?: number;
+  height?: number;
+}> = ({ data, width = 350, height = 200 }) => {
+  if (data.length === 0) return null;
+  const padding = { top: 25, right: 10, bottom: 40, left: 35 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+  const maxVal = Math.max(...data.map(d => d.value), 1);
+  const barW = Math.min(40, (chartW / data.length) * 0.7);
+  const gap = (chartW - barW * data.length) / (data.length + 1);
+
+  return (
+    <svg width={width} height={height}>
+      {[0, 0.5, 1].map((r, i) => (
+        <g key={i}>
+          <line x1={padding.left} y1={padding.top + chartH * (1 - r)} x2={width - padding.right} y2={padding.top + chartH * (1 - r)} stroke="#e5e7eb" strokeDasharray={r === 0 ? "0" : "3,3"} />
+          <text x={padding.left - 5} y={padding.top + chartH * (1 - r) + 4} textAnchor="end" className="text-[10px] fill-gray-400">{Math.round(maxVal * r)}</text>
+        </g>
+      ))}
+      {data.map((d, i) => {
+        const x = padding.left + gap + i * (barW + gap);
+        const barH = (d.value / maxVal) * chartH;
+        const y = padding.top + chartH - barH;
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barW} height={barH} rx={4} fill={d.color} className="transition-all duration-500" />
+            <rect x={x} y={y} width={barW / 2} height={barH} rx={4} fill="rgba(255,255,255,0.2)" />
+            {d.value > 0 && <text x={x + barW / 2} y={y - 6} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">{d.value}</text>}
+            <text x={x + barW / 2} y={height - 10} textAnchor="middle" className="text-[9px] fill-gray-500">{d.label.slice(0, 8)}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+// Horizontal Bar Chart
+const HorizontalBarChart: React.FC<{
+  data: { label: string; value: number; color: string; percent?: number }[];
+  showPercent?: boolean;
+}> = ({ data, showPercent = true }) => {
+  const maxVal = Math.max(...data.map(d => d.value), 1);
+  return (
+    <div className="space-y-3">
+      {data.map((d, i) => (
+        <div key={i}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm text-gray-700">{d.label}</span>
+            <span className="text-sm font-semibold text-gray-900">
+              {d.value} {showPercent && d.percent !== undefined && <span className="text-gray-400 font-normal">({d.percent}%)</span>}
+            </span>
+          </div>
+          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(d.value / maxVal) * 100}%`, backgroundColor: d.color }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Mini Sparkline
+const Sparkline: React.FC<{ data: number[]; color?: string; width?: number; height?: number }> = ({ data, color = '#3b82f6', width = 80, height = 24 }) => {
+  if (data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const getX = (i: number) => (i / (data.length - 1)) * width;
+  const getY = (v: number) => height - (v / max) * height;
+  const path = data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(v)}`).join(' ');
+  return (
+    <svg width={width} height={height}>
+      <path d={`${path} L ${width} ${height} L 0 ${height} Z`} fill={color} fillOpacity={0.15} />
+      <path d={path} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={getX(data.length - 1)} cy={getY(data[data.length - 1])} r={2} fill={color} />
+    </svg>
   );
 };
 
@@ -735,64 +1087,249 @@ const LoginPageV2: React.FC<{ onLogin: (email: string, password: string) => Prom
 // ============================================
 
 const Sidebar: React.FC = () => {
-  const { currentView, setCurrentView, sidebarOpen, setSidebarOpen } = useAdmin();
+  const { currentView, setCurrentView, sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed, tickets, appTheme, t } = useAdmin();
   const { user, hasPermission } = useAuth();
+  const theme = THEME_STYLES[appTheme];
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard className="w-5 h-5" />, permission: null },
-    { id: 'tickets', label: 'Tickets SAV', icon: <TicketIcon className="w-5 h-5" />, permission: 'tickets' },
-    { id: 'clients', label: 'Liste des clients', icon: <UserCircle className="w-5 h-5" />, permission: 'tickets' },
-    { id: 'team', label: 'Équipe', icon: <Users className="w-5 h-5" />, permission: 'team' },
-    { id: 'automation', label: 'Automatisation', icon: <Workflow className="w-5 h-5" />, permission: 'automation' },
-    { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, permission: 'reports' },
-    { id: 'settings', label: 'Paramètres', icon: <Settings className="w-5 h-5" />, permission: 'settings' },
+  // Check permissions
+  const isAdmin = user?.role === UserRole.ADMIN || user?.role === 'ADMIN';
+  const canAccess = (permission: string | null) => !permission || isAdmin || hasPermission(permission);
+
+  // Count tickets by status
+  const openTicketsCount = tickets.filter(tk => tk.status === 'OPEN' || tk.status === 'REOPENED').length;
+
+  // Menu sections structure with translations
+  const menuSections = [
+    {
+      title: 'DASHBOARD',
+      items: [
+        { id: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard className="w-5 h-5" />, permission: null },
+      ]
+    },
+    {
+      title: t('sidebar.tickets'),
+      permission: 'tickets',
+      items: [
+        { id: 'tickets', label: t('sidebar.allTickets'), icon: <TicketIcon className="w-5 h-5" />, permission: 'tickets' },
+        { id: 'tickets-open', label: t('sidebar.openTickets'), icon: <Clock className="w-5 h-5" />, permission: 'tickets', badge: openTicketsCount },
+        { id: 'tickets-closed', label: t('sidebar.closedTickets'), icon: <CheckCircle className="w-5 h-5" />, permission: 'tickets' },
+      ]
+    },
+    {
+      title: t('sidebar.clients'),
+      permission: 'tickets',
+      items: [
+        { id: 'clients', label: t('sidebar.clientsList'), icon: <UserCircle className="w-5 h-5" />, permission: 'tickets' },
+      ]
+    },
+    {
+      title: t('sidebar.admin'),
+      permission: 'team',
+      items: [
+        { id: 'team', label: t('sidebar.users'), icon: <Users className="w-5 h-5" />, permission: 'team' },
+        { id: 'automation', label: t('sidebar.automation'), icon: <Workflow className="w-5 h-5" />, permission: 'automation' },
+        { id: 'analytics', label: t('sidebar.analytics'), icon: <BarChart3 className="w-5 h-5" />, permission: 'reports' },
+        { id: 'settings', label: t('sidebar.settings'), icon: <Settings className="w-5 h-5" />, permission: 'settings' },
+      ]
+    },
   ];
 
-  // Filtrer les items selon les permissions - ADMIN a accès à tout via '*'
-  const isAdmin = user?.role === UserRole.ADMIN || user?.role === 'ADMIN';
-  const filteredItems = menuItems.filter(i => !i.permission || isAdmin || hasPermission(i.permission));
+  const handleMenuClick = (itemId: string) => {
+    // Handle special ticket views
+    if (itemId === 'tickets-open') {
+      setCurrentView('tickets');
+      // Will set filter via URL or state
+      window.dispatchEvent(new CustomEvent('setTicketFilter', { detail: { status: 'OPEN' } }));
+    } else if (itemId === 'tickets-closed') {
+      setCurrentView('tickets');
+      window.dispatchEvent(new CustomEvent('setTicketFilter', { detail: { status: 'CLOSED' } }));
+    } else {
+      setCurrentView(itemId);
+      if (itemId === 'tickets') {
+        window.dispatchEvent(new CustomEvent('setTicketFilter', { detail: { status: '' } }));
+      }
+    }
+    setSidebarOpen(false);
+  };
+
+  // Couleurs de texte selon le thème (clair ou sombre)
+  const textPrimary = theme.isLight ? '#1e293b' : '#ffffff';
+  const textSecondary = theme.isLight ? '#475569' : '#cbd5e1';
+  const textHover = theme.isLight ? '#0f172a' : '#ffffff';
 
   return (
     <>
       {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} ${theme.isLight ? 'shadow-lg' : ''}`}
+        style={{ background: theme.sidebarBg }}
+      >
+        {/* Logo */}
+        <div
+          className={`flex items-center h-16 px-4 border-b ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+          style={{ borderColor: theme.borderColor }}
+        >
+          <div className={`flex items-center ${sidebarCollapsed ? '' : 'gap-3'}`}>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+              style={{ background: theme.logoBg }}
+            >
               <Wrench className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <span className="font-bold text-gray-900">SAV Pro</span>
-              <span className="text-xs text-blue-600 ml-1 font-semibold">V2</span>
-            </div>
+            {!sidebarCollapsed && (
+              <div>
+                <span className="font-bold" style={{ color: textPrimary }}>SAV Pro</span>
+                <span className="text-xs ml-1 font-semibold" style={{ color: theme.accentColor }}>V2</span>
+              </div>
+            )}
           </div>
-          <button className="lg:hidden text-gray-400 hover:text-gray-600" onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
+          <button
+            className="lg:hidden transition-colors"
+            style={{ color: theme.accentColor }}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
+        {/* User info */}
         {user && (
-          <div className="p-4 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-                <span className="text-sm font-semibold text-blue-600">{getInitials(user.displayName, user.email)}</span>
+          <div
+            className={`py-3 border-b ${sidebarCollapsed ? 'px-2' : 'px-4'}`}
+            style={{ borderColor: theme.borderColor }}
+          >
+            <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'}`} title={sidebarCollapsed ? `${user.displayName} - ${ROLE_CONFIG[user.role]?.label || user.role}` : undefined}>
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center border"
+                style={{ background: theme.isLight ? '#e2e8f0' : theme.hoverBg, borderColor: theme.borderColor }}
+              >
+                <span className="text-sm font-semibold" style={{ color: theme.accentColor }}>{getInitials(user.displayName, user.email)}</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{user.displayName}</p>
-                <Badge className={`text-[10px] ${ROLE_CONFIG[user.role]?.color || 'bg-gray-100 text-gray-800'}`}>
-                  {ROLE_CONFIG[user.role]?.label || user.role}
-                </Badge>
-              </div>
+              {!sidebarCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: textPrimary }}>{user.displayName}</p>
+                  <p className="text-xs" style={{ color: theme.textMuted }}>{ROLE_CONFIG[user.role]?.label || user.role}</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        <nav className="p-3 space-y-1 overflow-y-auto h-[calc(100vh-10rem)]">
-          {filteredItems.map(i => (
-            <button key={i.id} onClick={() => { setCurrentView(i.id); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${currentView === i.id ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
-              {i.icon}<span>{i.label}</span>
-            </button>
-          ))}
+        {/* Navigation */}
+        <nav className={`py-4 overflow-y-auto h-[calc(100vh-10rem)] space-y-6 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
+          {menuSections.map((section) => {
+            // Check if user has access to this section
+            if (section.permission && !canAccess(section.permission)) return null;
+
+            // Filter items by permission
+            const visibleItems = section.items.filter(item => canAccess(item.permission));
+            if (visibleItems.length === 0) return null;
+
+            return (
+              <div key={section.title}>
+                {!sidebarCollapsed && (
+                  <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                    {section.title}
+                  </h3>
+                )}
+                {sidebarCollapsed && (
+                  <div className="w-8 h-px mx-auto mb-2" style={{ backgroundColor: theme.borderColor }} />
+                )}
+                <div className="space-y-1">
+                  {visibleItems.map(item => {
+                    const isActive = currentView === item.id ||
+                      (item.id === 'tickets-open' && currentView === 'tickets') ||
+                      (item.id === 'tickets-closed' && currentView === 'tickets');
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleMenuClick(item.id)}
+                        title={sidebarCollapsed ? item.label : undefined}
+                        className={`w-full flex items-center rounded-lg text-sm font-medium group relative select-none outline-none focus:outline-none
+                          ${sidebarCollapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5'}
+                          ${currentView === item.id ? 'shadow-lg' : 'hover:bg-opacity-50'}`}
+                        style={{
+                          background: currentView === item.id ? theme.activeBg : 'transparent',
+                          color: currentView === item.id ? '#ffffff' : textSecondary,
+                          transition: 'all 0.15s ease',
+                          WebkitUserSelect: 'none',
+                          userSelect: 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (currentView !== item.id) {
+                            e.currentTarget.style.background = theme.hoverBg;
+                            e.currentTarget.style.color = textHover;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (currentView !== item.id) {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = textSecondary;
+                          }
+                        }}
+                      >
+                        <span style={{ color: currentView === item.id ? '#ffffff' : theme.accentColor }} className="transition-colors">
+                          {item.icon}
+                        </span>
+                        {!sidebarCollapsed && (
+                          <>
+                            <span className="flex-1 text-left">{item.label}</span>
+                            {item.badge !== undefined && item.badge > 0 && (
+                              <span
+                                className="px-2 py-0.5 text-xs font-semibold rounded-full"
+                                style={currentView === item.id
+                                  ? { backgroundColor: 'rgba(255,255,255,0.2)', color: '#ffffff' }
+                                  : { backgroundColor: theme.isLight ? '#e2e8f0' : theme.hoverBg, color: theme.accentColor }
+                                }
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {sidebarCollapsed && item.badge !== undefined && item.badge > 0 && (
+                          <span
+                            className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full text-white"
+                            style={{ background: theme.logoBg }}
+                          >
+                            {item.badge > 99 ? '99+' : item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </nav>
+
+        {/* Footer with collapse toggle */}
+        <div className="absolute bottom-0 left-0 right-0 border-t" style={{ borderColor: theme.borderColor }}>
+          {/* Collapse toggle button */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden lg:flex w-full items-center justify-center p-3 transition-colors"
+            style={{ color: theme.accentColor }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = theme.hoverBg; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            title={sidebarCollapsed ? 'Agrandir le menu' : 'Réduire le menu'}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="w-5 h-5" />
+            ) : (
+              <ChevronLeft className="w-5 h-5" />
+            )}
+          </button>
+          {!sidebarCollapsed && (
+            <div className="flex items-center justify-center gap-2 text-xs pb-3" style={{ color: theme.textMuted }}>
+              <span>KLY Groupe</span>
+              <span>•</span>
+              <span>v2.0</span>
+            </div>
+          )}
+        </div>
       </aside>
     </>
   );
@@ -911,7 +1448,7 @@ const Header: React.FC = () => {
       </div>
 
       {showNotifs && (
-        <div className="absolute right-4 top-16 w-[420px] bg-white rounded-xl shadow-xl border border-gray-200 z-50 animate-in fade-in slide-in-from-top-2">
+        <div className="absolute right-2 sm:right-4 top-16 w-[calc(100vw-1rem)] sm:w-[420px] max-w-[420px] bg-white rounded-xl shadow-xl border border-gray-200 z-50 animate-in fade-in slide-in-from-top-2">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-gray-900">Notifications</h3>
@@ -1306,7 +1843,7 @@ const AIAssistant: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpe
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 w-[420px] h-[560px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 animate-in fade-in slide-in-from-bottom-4">
+    <div className="fixed bottom-0 right-0 sm:bottom-4 sm:right-4 w-full sm:w-[420px] h-[100dvh] sm:h-[560px] bg-white sm:rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-2xl">
         <div className="flex items-center gap-3 text-white">
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -1628,7 +2165,7 @@ const ChatPanel: React.FC<{
   }
 
   return (
-    <div className="flex flex-col h-[500px] bg-gray-50 rounded-xl overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-400px)] min-h-[400px] max-h-[700px] bg-gray-50 rounded-xl overflow-hidden">
       {/* AI Status bar */}
       <div className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -1662,7 +2199,7 @@ const ChatPanel: React.FC<{
           <span className="text-gray-600">Vous</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500" />
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600" />
           <span className="text-gray-600">Opérateur</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -1734,7 +2271,7 @@ const ChatPanel: React.FC<{
                 // Autre opérateur
                 return {
                   bubble: 'bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300',
-                  avatar: 'bg-gradient-to-br from-emerald-400 to-teal-500',
+                  avatar: 'bg-gradient-to-br from-blue-500 to-indigo-600',
                   avatarIcon: <Headphones className="w-4 h-4 text-white" />,
                   headerColor: 'text-emerald-700',
                   timeColor: 'text-emerald-600',
@@ -2024,10 +2561,18 @@ const ChatPanel: React.FC<{
           </button>
           <div className="flex-1 relative">
             <Textarea
-              placeholder={isInternal ? "Note interne (visible uniquement par l'équipe)..." : "Écrivez votre message..."}
+              placeholder={isInternal ? "Note interne (visible uniquement par l'équipe)..." : "Écrivez votre message... (Entrée pour envoyer, Shift+Entrée pour nouvelle ligne)"}
               value={newMessage}
               onChange={e => setNewMessage(e.target.value)}
-              rows={2}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (newMessage.trim() || files.length > 0) {
+                    handleSend();
+                  }
+                }
+              }}
+              rows={4}
               className={`pr-12 ${isInternal ? 'bg-indigo-50 border-indigo-200 focus:border-indigo-400' : ''}`}
             />
           </div>
@@ -2830,7 +3375,7 @@ const TicketDetailModal: React.FC<{
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="text-lg font-mono font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg">#{ticket.ticketNumber}</span>
+              <span className="text-lg font-mono font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg">#{ticket.ticketRef || ticket.ticketNumber}</span>
               <Badge className={`${getStatusColor(editedTicket.status)} text-sm px-3 py-1`}>{STATUS_LABELS[editedTicket.status]}</Badge>
               <Badge className={`${getPriorityColor(editedTicket.priority)} text-sm px-3 py-1`}>{PRIORITY_LABELS[editedTicket.priority]}</Badge>
               <Badge className="bg-gray-100 text-gray-600 text-sm px-3 py-1">{ISSUE_TYPE_LABELS[editedTicket.issueType]}</Badge>
@@ -3437,7 +3982,7 @@ const TicketDetailPage: React.FC = () => {
             </button>
             <div className="h-6 w-px bg-gray-300" />
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-lg font-mono font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg">#{ticket.ticketNumber}</span>
+              <span className="text-lg font-mono font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg">#{ticket.ticketRef || ticket.ticketNumber}</span>
               <Badge className={`${getStatusColor(editedTicket.status)} text-sm px-3 py-1`}>{STATUS_LABELS[editedTicket.status]}</Badge>
               <Badge className={`${getPriorityColor(editedTicket.priority)} text-sm px-3 py-1`}>{PRIORITY_LABELS[editedTicket.priority]}</Badge>
               <Badge className="bg-gray-100 text-gray-600 text-sm px-3 py-1">{ISSUE_TYPE_LABELS[editedTicket.issueType]}</Badge>
@@ -4219,6 +4764,11 @@ const DashboardView: React.FC = () => {
   const breachedCount = stats?.slaBreached || 0;
   const unassignedCount = tickets.filter(t => !t.assignedToId && (t.status === TicketStatus.OPEN || t.status === TicketStatus.REOPENED)).length;
 
+  // Tickets actifs = tous sauf RESOLVED et CLOSED (travail restant)
+  const activeTicketsCount = (stats?.total || 0)
+    - (stats?.byStatus?.[TicketStatus.RESOLVED] || 0)
+    - (stats?.byStatus?.[TicketStatus.CLOSED] || 0);
+
   const handleAutoAssign = async () => {
     setIsAutoAssigning(true);
     await autoAssignTickets();
@@ -4269,7 +4819,7 @@ const DashboardView: React.FC = () => {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard title="Total tickets" value={stats?.total || 0} icon={<TicketIcon className="w-6 h-6" />} color="purple" onClick={() => setCurrentView('tickets')} subtitle="Tous les tickets" />
+        <KPICard title="Tickets actifs" value={activeTicketsCount} icon={<TicketIcon className="w-6 h-6" />} color="purple" onClick={() => setCurrentView('tickets')} subtitle="À traiter" />
         <KPICard title="Tickets ouverts" value={openCount} icon={<Clock className="w-6 h-6" />} color="blue" subtitle="En attente de traitement" />
         <KPICard title="En cours" value={inProgressCount} icon={<Activity className="w-6 h-6" />} color="yellow" subtitle="Actuellement traités" />
         <KPICard title="SLA dépassés" value={breachedCount} icon={<AlertTriangle className="w-6 h-6" />} color="red" subtitle="Nécessitent attention" />
@@ -4289,7 +4839,7 @@ const DashboardView: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-mono font-semibold text-blue-600">#{t.ticketNumber}</span>
+                      <span className="text-sm font-mono font-semibold text-blue-600">#{t.ticketRef || t.ticketNumber}</span>
                       <Badge className={getPriorityColor(t.priority)}>{PRIORITY_LABELS[t.priority]}</Badge>
                       {!t.assignedToId && <Badge className="bg-orange-100 text-orange-700 text-[10px]">Non assigné</Badge>}
                     </div>
@@ -4714,6 +5264,17 @@ const TicketsView: React.FC = () => {
   const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
 
+  // Listen for filter changes from sidebar
+  useEffect(() => {
+    const handleFilterChange = (event: CustomEvent<{ status: string }>) => {
+      const { status } = event.detail;
+      setFilters(f => ({ ...f, status }));
+      setCurrentPage(1);
+    };
+    window.addEventListener('setTicketFilter', handleFilterChange as EventListener);
+    return () => window.removeEventListener('setTicketFilter', handleFilterChange as EventListener);
+  }, []);
+
   // Gestion de la sélection
   const toggleTicketSelection = (ticketId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -4907,7 +5468,7 @@ const TicketsView: React.FC = () => {
 
         {/* Filtres principaux */}
         <div className="flex flex-wrap items-center gap-3 mt-4">
-          <Input placeholder="Rechercher titre, client..." value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} icon={<Search className="w-4 h-4" />} className="w-64" />
+          <Input placeholder="Rechercher titre, client..." value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} icon={<Search className="w-4 h-4" />} className="w-full sm:w-64" />
           <Select value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))} options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))} placeholder="Tous statuts" />
           <Select value={filters.priority} onChange={e => setFilters(f => ({ ...f, priority: e.target.value }))} options={Object.entries(PRIORITY_LABELS).map(([value, label]) => ({ value, label }))} placeholder="Toutes priorités" />
           <button
@@ -5115,7 +5676,7 @@ const TicketsView: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-mono font-semibold text-blue-600">#{t.ticketNumber}</span>
+                          <span className="text-sm font-mono font-semibold text-blue-600">#{t.ticketRef || t.ticketNumber}</span>
                           {unreadCount > 0 && (
                             <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] font-semibold rounded-full animate-pulse">
                               <Bell className="w-3 h-3" />
@@ -5575,7 +6136,6 @@ const TeamView: React.FC = () => {
   const { hasPermission } = useAuth();
   // Filter staff users (not CUSTOMER) - check both enum and string formats
   const staffUsers = users.filter(u => u.role !== UserRole.CUSTOMER && u.role !== 'CUSTOMER');
-  console.log('[TeamView] Total users:', users.length, '| Staff users:', staffUsers.length, '| Users:', users);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -5814,40 +6374,195 @@ const TeamView: React.FC = () => {
 };
 
 const AutomationView: React.FC = () => {
-  const [rules, setRules] = useState(mockAutomationRules);
+  const [rules, setRules] = useState<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    trigger: string;
+    conditions: Array<{ field: string; operator: string; value: unknown }>;
+    actions: Array<{ type: string; params?: Record<string, unknown> }>;
+    isActive: boolean;
+    priority: number;
+    _count?: { executions: number };
+  }>>([]);
+  const [stats, setStats] = useState<{
+    activeRules: number;
+    todayExecutions: number;
+    autoAssignCount: number;
+    notificationCount: number;
+  }>({ activeRules: 0, todayExecutions: 0, autoAssignCount: 0, notificationCount: 0 });
+  const [isLoading, setIsLoading] = useState(true);
   const [showTemplates, setShowTemplates] = useState(false);
-  const showCreateModalState = useState(false);
-  const setShowCreateModal = showCreateModalState[1];
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newRule, setNewRule] = useState({
+    name: '',
+    description: '',
+    trigger: 'TICKET_CREATED',
+    conditions: [] as Array<{ field: string; operator: string; value: string }>,
+    actions: [] as Array<{ type: string }>,
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const toggleRule = (id: string) => setRules(rules.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r));
+  // Charger les règles et stats au montage
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const deleteRule = (id: string) => {
-    if (confirm('Supprimer cette règle ?')) {
-      setRules(rules.filter(r => r.id !== id));
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [rulesData, statsData] = await Promise.all([
+        AdminApi.getAutomationRules(true),
+        AdminApi.getAutomationStats(),
+      ]);
+      setRules(rulesData);
+      setStats(statsData);
+    } catch (error) {
+      console.error('Erreur chargement automatisation:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const addFromTemplate = (template: typeof AUTOMATION_TEMPLATES[0]) => {
-    const newRule: AutomationRule = {
-      id: Date.now().toString(),
-      name: template.name,
-      trigger: template.trigger,
-      conditions: template.conditions,
-      actions: template.actions,
-      isActive: false,
-    };
-    setRules([...rules, newRule]);
-    setShowTemplates(false);
+  const toggleRule = async (id: string) => {
+    try {
+      const updated = await AdminApi.toggleAutomationRule(id);
+      setRules(rules.map(r => r.id === id ? { ...r, isActive: updated.isActive } : r));
+      // Mettre à jour les stats
+      const newStats = await AdminApi.getAutomationStats();
+      setStats(newStats);
+    } catch (error) {
+      console.error('Erreur toggle règle:', error);
+    }
   };
 
-  const activeRulesCount = rules.filter(r => r.isActive).length;
+  const deleteRule = async (id: string) => {
+    if (!confirm('Supprimer cette règle ?')) return;
+    try {
+      await AdminApi.deleteAutomationRule(id);
+      setRules(rules.filter(r => r.id !== id));
+      const newStats = await AdminApi.getAutomationStats();
+      setStats(newStats);
+    } catch (error) {
+      console.error('Erreur suppression règle:', error);
+    }
+  };
+
+  const addFromTemplate = async (template: typeof AUTOMATION_TEMPLATES[0]) => {
+    try {
+      // Convertir les conditions et actions du template
+      const conditions = template.conditions.map(c => {
+        const parts = c.split(' ');
+        return { field: parts[0], operator: 'eq', value: parts[2] || '' };
+      });
+      const actions = template.actions.map(a => ({ type: a }));
+
+      // Mapper le trigger vers l'enum backend
+      const triggerMap: Record<string, string> = {
+        'ticket.created': 'TICKET_CREATED',
+        'ticket.updated': 'TICKET_UPDATED',
+        'ticket.status_changed': 'TICKET_STATUS_CHANGED',
+        'ticket.resolved': 'TICKET_RESOLVED',
+        'ticket.closed': 'TICKET_CLOSED',
+        'ticket.idle.4h': 'TICKET_IDLE_4H',
+        'ticket.waiting.3days': 'TICKET_WAITING_3DAYS',
+        'ticket.resolved.7days': 'TICKET_RESOLVED_7DAYS',
+        'sla.warning': 'SLA_WARNING',
+        'sla.breach': 'SLA_BREACH',
+      };
+
+      const newRule = await AdminApi.createAutomationRule({
+        name: template.name,
+        description: template.description,
+        trigger: triggerMap[template.trigger] || 'TICKET_CREATED',
+        conditions,
+        actions,
+        isActive: false,
+      });
+      setRules([...rules, newRule]);
+      setShowTemplates(false);
+    } catch (error) {
+      console.error('Erreur création règle depuis template:', error);
+    }
+  };
+
+  const handleCreateRule = async () => {
+    if (!newRule.name || newRule.actions.length === 0) {
+      alert('Veuillez remplir le nom et ajouter au moins une action');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const created = await AdminApi.createAutomationRule({
+        name: newRule.name,
+        description: newRule.description,
+        trigger: newRule.trigger,
+        conditions: newRule.conditions,
+        actions: newRule.actions,
+        isActive: true,
+      });
+      setRules([...rules, created]);
+      setShowCreateModal(false);
+      setNewRule({ name: '', description: '', trigger: 'TICKET_CREATED', conditions: [], actions: [] });
+      const newStats = await AdminApi.getAutomationStats();
+      setStats(newStats);
+    } catch (error) {
+      console.error('Erreur création règle:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatCondition = (c: { field: string; operator: string; value: unknown }) => {
+    const opLabels: Record<string, string> = { eq: '=', neq: '≠', gt: '>', lt: '<', gte: '≥', lte: '≤', contains: 'contient', in: 'dans' };
+    return `${c.field} ${opLabels[c.operator] || c.operator} ${c.value}`;
+  };
+
+  const getActionLabel = (action: { type: string }) => {
+    return ACTION_LABELS[action.type]?.label || action.type;
+  };
+
+  const getActionColor = (action: { type: string }) => {
+    const color = ACTION_LABELS[action.type]?.color;
+    const colorMap: Record<string, string> = {
+      blue: 'bg-blue-50 text-blue-700 border-blue-200',
+      purple: 'bg-purple-50 text-purple-700 border-purple-200',
+      red: 'bg-red-50 text-red-700 border-red-200',
+      green: 'bg-green-50 text-green-700 border-green-200',
+      yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+      orange: 'bg-orange-50 text-orange-700 border-orange-200',
+    };
+    return colorMap[color || ''] || 'bg-gray-50 text-gray-700 border-gray-200';
+  };
+
+  // Mapping des triggers backend vers les labels
+  const triggerLabelsBackend: Record<string, string> = {
+    'TICKET_CREATED': 'Création de ticket',
+    'TICKET_UPDATED': 'Mise à jour de ticket',
+    'TICKET_STATUS_CHANGED': 'Changement de statut',
+    'TICKET_RESOLVED': 'Ticket résolu',
+    'TICKET_CLOSED': 'Ticket fermé',
+    'TICKET_IDLE_4H': 'Ticket inactif 4h',
+    'TICKET_WAITING_3DAYS': 'En attente 3 jours',
+    'TICKET_RESOLVED_7DAYS': 'Résolu depuis 7 jours',
+    'SLA_WARNING': 'Alerte SLA',
+    'SLA_BREACH': 'SLA dépassé',
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Automatisation</h1>
-          <p className="text-gray-500">{rules.length} règle{rules.length > 1 ? 's' : ''} • {activeRulesCount} active{activeRulesCount > 1 ? 's' : ''}</p>
+          <p className="text-gray-500">{rules.length} règle{rules.length > 1 ? 's' : ''} • {stats.activeRules} active{stats.activeRules > 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setShowTemplates(!showTemplates)}>
@@ -5893,7 +6608,7 @@ const AutomationView: React.FC = () => {
               <Activity className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-green-700">{activeRulesCount}</p>
+              <p className="text-2xl font-bold text-green-700">{stats.activeRules}</p>
               <p className="text-xs text-green-600">Règles actives</p>
             </div>
           </div>
@@ -5904,7 +6619,7 @@ const AutomationView: React.FC = () => {
               <Zap className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-blue-700">127</p>
+              <p className="text-2xl font-bold text-blue-700">{stats.todayExecutions}</p>
               <p className="text-xs text-blue-600">Exécutions aujourd'hui</p>
             </div>
           </div>
@@ -5915,7 +6630,7 @@ const AutomationView: React.FC = () => {
               <Users className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-purple-700">45</p>
+              <p className="text-2xl font-bold text-purple-700">{stats.autoAssignCount}</p>
               <p className="text-xs text-purple-600">Auto-assignations</p>
             </div>
           </div>
@@ -5926,7 +6641,7 @@ const AutomationView: React.FC = () => {
               <Bell className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-orange-700">82</p>
+              <p className="text-2xl font-bold text-orange-700">{stats.notificationCount}</p>
               <p className="text-xs text-orange-600">Notifications envoyées</p>
             </div>
           </div>
@@ -5946,33 +6661,26 @@ const AutomationView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900">{r.name}</h3>
                     {r.isActive && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Active</span>}
+                    {r._count?.executions !== undefined && (
+                      <span className="text-xs text-gray-400">{r._count.executions} exécution{r._count.executions > 1 ? 's' : ''}</span>
+                    )}
                   </div>
+                  {r.description && <p className="text-xs text-gray-400 mt-0.5">{r.description}</p>}
                   <p className="text-sm text-gray-500 mt-1">
-                    Déclencheur: <code className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{TRIGGER_LABELS[r.trigger] || r.trigger}</code>
+                    Déclencheur: <code className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{triggerLabelsBackend[r.trigger] || r.trigger}</code>
                   </p>
                   <div className="flex flex-wrap items-center gap-2 mt-3">
                     <span className="text-xs text-gray-400">SI</span>
                     {r.conditions.length > 0 ? r.conditions.map((c, i) => (
-                      <span key={i} className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg border border-yellow-200">{c}</span>
+                      <span key={i} className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg border border-yellow-200">{formatCondition(c)}</span>
                     )) : <span className="text-xs text-gray-400 italic">Toujours</span>}
                     <span className="text-gray-400">→</span>
                     <span className="text-xs text-gray-400">ALORS</span>
-                    {r.actions.map((a, i) => {
-                      const actionInfo = ACTION_LABELS[a];
-                      return (
-                        <span key={i} className={`text-xs px-2 py-1 rounded-lg border ${
-                          actionInfo?.color === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                          actionInfo?.color === 'purple' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                          actionInfo?.color === 'red' ? 'bg-red-50 text-red-700 border-red-200' :
-                          actionInfo?.color === 'green' ? 'bg-green-50 text-green-700 border-green-200' :
-                          actionInfo?.color === 'yellow' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                          actionInfo?.color === 'orange' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                          'bg-gray-50 text-gray-700 border-gray-200'
-                        }`}>
-                          {actionInfo?.label || a}
-                        </span>
-                      );
-                    })}
+                    {r.actions.map((a, i) => (
+                      <span key={i} className={`text-xs px-2 py-1 rounded-lg border ${getActionColor(a)}`}>
+                        {getActionLabel(a)}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -5984,7 +6692,6 @@ const AutomationView: React.FC = () => {
                 >
                   <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${r.isActive ? 'translate-x-6' : ''}`} />
                 </button>
-                <Button variant="ghost" size="xs" title="Modifier"><Edit3 className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="xs" onClick={() => deleteRule(r.id)} className="text-red-500 hover:bg-red-50" title="Supprimer"><Trash2 className="w-4 h-4" /></Button>
               </div>
             </div>
@@ -6002,74 +6709,721 @@ const AutomationView: React.FC = () => {
           </Button>
         </Card>
       )}
+
+      {/* Modal de création */}
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Nouvelle règle d'automatisation" size="lg">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la règle</label>
+            <Input value={newRule.name} onChange={e => setNewRule({ ...newRule, name: e.target.value })} placeholder="Ex: Auto-assignation tickets urgents" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description (optionnel)</label>
+            <Input value={newRule.description} onChange={e => setNewRule({ ...newRule, description: e.target.value })} placeholder="Description de la règle" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Déclencheur</label>
+            <Select
+              value={newRule.trigger}
+              onChange={e => setNewRule({ ...newRule, trigger: e.target.value })}
+              options={Object.entries(triggerLabelsBackend).map(([value, label]) => ({ value, label }))}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Actions</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {newRule.actions.map((a, i) => (
+                <span key={i} className={`text-xs px-2 py-1 rounded-lg border flex items-center gap-1 ${getActionColor(a)}`}>
+                  {getActionLabel(a)}
+                  <button onClick={() => setNewRule({ ...newRule, actions: newRule.actions.filter((_, idx) => idx !== i) })} className="ml-1 text-gray-400 hover:text-red-500">×</button>
+                </span>
+              ))}
+            </div>
+            <Select
+              value=""
+              onChange={e => {
+                if (e.target.value && !newRule.actions.find(a => a.type === e.target.value)) {
+                  setNewRule({ ...newRule, actions: [...newRule.actions, { type: e.target.value }] });
+                }
+              }}
+              options={Object.entries(ACTION_LABELS).map(([value, info]) => ({ value, label: info.label }))}
+              placeholder="Ajouter une action..."
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>Annuler</Button>
+            <Button variant="primary" onClick={handleCreateRule} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+              Créer la règle
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
 
 const AnalyticsView: React.FC = () => {
-  const { stats } = useAdmin();
+  const { stats, tickets, users } = useAdmin();
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterAgent, setFilterAgent] = useState<string>('all');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Filtrer les tickets selon les critères
+  const filteredTickets = useMemo(() => {
+    let filtered = [...tickets];
+
+    // Filtre par date
+    const now = new Date();
+    const dateFilters: Record<string, number> = {
+      '7d': 7,
+      '30d': 30,
+      '90d': 90,
+      '1y': 365,
+    };
+    if (dateRange !== 'all' && dateFilters[dateRange]) {
+      const cutoff = new Date(now.getTime() - dateFilters[dateRange] * 24 * 60 * 60 * 1000);
+      filtered = filtered.filter(t => new Date(t.createdAt) >= cutoff);
+    }
+
+    // Filtre par statut
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(t => t.status === filterStatus);
+    }
+
+    // Filtre par priorité
+    if (filterPriority !== 'all') {
+      filtered = filtered.filter(t => t.priority === filterPriority);
+    }
+
+    // Filtre par type
+    if (filterType !== 'all') {
+      filtered = filtered.filter(t => t.issueType === filterType);
+    }
+
+    // Filtre par agent
+    if (filterAgent !== 'all') {
+      filtered = filtered.filter(t => t.assignedToId === filterAgent);
+    }
+
+    return filtered;
+  }, [tickets, dateRange, filterStatus, filterPriority, filterType, filterAgent]);
+
+  // Calculer les stats filtrées
+  const filteredStats = useMemo(() => {
+    const byStatus: Record<string, number> = {};
+    const byPriority: Record<string, number> = {};
+    const byIssueType: Record<string, number> = {};
+    const byAgent: Record<string, number> = {};
+    let slaBreached = 0;
+    let totalResolutionTime = 0;
+    let resolvedCount = 0;
+
+    filteredTickets.forEach(t => {
+      byStatus[t.status] = (byStatus[t.status] || 0) + 1;
+      byPriority[t.priority] = (byPriority[t.priority] || 0) + 1;
+      byIssueType[t.issueType] = (byIssueType[t.issueType] || 0) + 1;
+      if (t.assignedToId) {
+        byAgent[t.assignedToId] = (byAgent[t.assignedToId] || 0) + 1;
+      }
+      if (t.slaBreached) slaBreached++;
+      if (t.status === 'RESOLVED' || t.status === 'CLOSED') {
+        const created = new Date(t.createdAt).getTime();
+        const updated = new Date(t.updatedAt).getTime();
+        totalResolutionTime += (updated - created) / (1000 * 60); // minutes
+        resolvedCount++;
+      }
+    });
+
+    return {
+      total: filteredTickets.length,
+      byStatus,
+      byPriority,
+      byIssueType,
+      byAgent,
+      slaBreached,
+      avgResolutionTime: resolvedCount > 0 ? totalResolutionTime / resolvedCount : 0,
+      resolvedCount,
+    };
+  }, [filteredTickets]);
+
+  // Agents pour le filtre
+  const agents = users.filter(u => ['AGENT', 'SUPERVISOR', 'ADMIN'].includes(u.role as string));
+
+  // Export CSV
+  const exportCSV = () => {
+    const headers = ['N° Ticket', 'Titre', 'Statut', 'Priorité', 'Type', 'Client', 'Agent', 'Créé le', 'SLA dépassé'];
+    const rows = filteredTickets.map(t => [
+      t.ticketNumber || t.id,
+      `"${(t.title || '').replace(/"/g, '""')}"`,
+      STATUS_LABELS[t.status] || t.status,
+      PRIORITY_LABELS[t.priority] || t.priority,
+      ISSUE_TYPE_LABELS[t.issueType] || t.issueType,
+      `"${(t.customer?.displayName || t.contactName || t.companyName || '').replace(/"/g, '""')}"`,
+      `"${(t.assignedTo?.displayName || 'Non assigné').replace(/"/g, '""')}"`,
+      new Date(t.createdAt).toLocaleDateString('fr-FR'),
+      t.slaBreached ? 'Oui' : 'Non',
+    ]);
+
+    const csv = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics_tickets_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  // Export JSON
+  const exportJSON = () => {
+    const data = {
+      exportDate: new Date().toISOString(),
+      filters: { dateRange, filterStatus, filterPriority, filterType, filterAgent },
+      summary: filteredStats,
+      tickets: filteredTickets.map(t => ({
+        ticketNumber: t.ticketNumber,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        issueType: t.issueType,
+        customer: t.customer?.displayName || t.contactName || t.companyName,
+        agent: t.assignedTo?.displayName,
+        createdAt: t.createdAt,
+        slaBreached: t.slaBreached,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics_tickets_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  // Export rapport texte
+  const exportReport = () => {
+    const slaRate = filteredStats.total > 0 ? Math.round(((filteredStats.total - filteredStats.slaBreached) / filteredStats.total) * 100) : 0;
+    const avgTime = filteredStats.avgResolutionTime > 0 ? `${Math.round(filteredStats.avgResolutionTime / 60)}h ${Math.round(filteredStats.avgResolutionTime % 60)}m` : 'N/A';
+
+    let report = `RAPPORT ANALYTICS SAV PRO\n`;
+    report += `${'='.repeat(50)}\n`;
+    report += `Date d'export: ${new Date().toLocaleString('fr-FR')}\n`;
+    report += `Période: ${dateRange === 'all' ? 'Toutes les données' : `${dateRange.replace('d', ' jours').replace('y', ' an')}`}\n\n`;
+
+    report += `RÉSUMÉ\n${'-'.repeat(30)}\n`;
+    report += `Total tickets: ${filteredStats.total}\n`;
+    report += `Taux SLA: ${slaRate}%\n`;
+    report += `SLA dépassés: ${filteredStats.slaBreached}\n`;
+    report += `Temps moyen résolution: ${avgTime}\n`;
+    report += `Tickets résolus: ${filteredStats.resolvedCount}\n\n`;
+
+    report += `PAR STATUT\n${'-'.repeat(30)}\n`;
+    Object.entries(STATUS_LABELS).forEach(([status, label]) => {
+      const count = filteredStats.byStatus[status] || 0;
+      const pct = filteredStats.total > 0 ? Math.round((count / filteredStats.total) * 100) : 0;
+      report += `${label}: ${count} (${pct}%)\n`;
+    });
+
+    report += `\nPAR PRIORITÉ\n${'-'.repeat(30)}\n`;
+    Object.entries(PRIORITY_LABELS).forEach(([priority, label]) => {
+      const count = filteredStats.byPriority[priority] || 0;
+      const pct = filteredStats.total > 0 ? Math.round((count / filteredStats.total) * 100) : 0;
+      report += `${label}: ${count} (${pct}%)\n`;
+    });
+
+    report += `\nPAR TYPE\n${'-'.repeat(30)}\n`;
+    Object.entries(ISSUE_TYPE_LABELS).forEach(([type, label]) => {
+      const count = filteredStats.byIssueType[type] || 0;
+      const pct = filteredStats.total > 0 ? Math.round((count / filteredStats.total) * 100) : 0;
+      report += `${label}: ${count} (${pct}%)\n`;
+    });
+
+    if (Object.keys(filteredStats.byAgent).length > 0) {
+      report += `\nPAR AGENT\n${'-'.repeat(30)}\n`;
+      Object.entries(filteredStats.byAgent).forEach(([agentId, count]) => {
+        const agent = users.find(u => u.id === agentId);
+        const pct = filteredStats.total > 0 ? Math.round((count / filteredStats.total) * 100) : 0;
+        report += `${agent?.displayName || 'Inconnu'}: ${count} (${pct}%)\n`;
+      });
+    }
+
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rapport_analytics_${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  const slaRate = filteredStats.total > 0 ? Math.round(((filteredStats.total - filteredStats.slaBreached) / filteredStats.total) * 100) : 0;
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-500">Statistiques et métriques</p>
+          <p className="text-gray-500">Statistiques et métriques • {filteredStats.total} tickets</p>
         </div>
-        <Button variant="secondary"><Download className="w-4 h-4 mr-2" />Exporter</Button>
+        <div className="relative">
+          <Button variant="secondary" onClick={() => setShowExportMenu(!showExportMenu)}>
+            <Download className="w-4 h-4 mr-2" />Exporter
+            <ChevronDown className="w-4 h-4 ml-2" />
+          </Button>
+          {showExportMenu && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+              <button onClick={exportCSV} className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-green-600" />
+                Export CSV (Excel)
+              </button>
+              <button onClick={exportJSON} className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-600" />
+                Export JSON
+              </button>
+              <button onClick={exportReport} className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-purple-600" />
+                Rapport texte
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Filtres */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">Filtres:</span>
+          </div>
+
+          {/* Période */}
+          <select
+            value={dateRange}
+            onChange={e => setDateRange(e.target.value as typeof dateRange)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="7d">7 derniers jours</option>
+            <option value="30d">30 derniers jours</option>
+            <option value="90d">90 derniers jours</option>
+            <option value="1y">1 an</option>
+            <option value="all">Tout</option>
+          </select>
+
+          {/* Statut */}
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">Tous les statuts</option>
+            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+
+          {/* Priorité */}
+          <select
+            value={filterPriority}
+            onChange={e => setFilterPriority(e.target.value)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">Toutes priorités</option>
+            {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+
+          {/* Type */}
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">Tous les types</option>
+            {Object.entries(ISSUE_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+
+          {/* Agent */}
+          <select
+            value={filterAgent}
+            onChange={e => setFilterAgent(e.target.value)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">Tous les agents</option>
+            {agents.map(agent => (
+              <option key={agent.id} value={agent.id}>{agent.displayName}</option>
+            ))}
+          </select>
+
+          {/* Reset */}
+          {(dateRange !== '30d' || filterStatus !== 'all' || filterPriority !== 'all' || filterType !== 'all' || filterAgent !== 'all') && (
+            <button
+              onClick={() => {
+                setDateRange('30d');
+                setFilterStatus('all');
+                setFilterPriority('all');
+                setFilterType('all');
+                setFilterAgent('all');
+              }}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <X className="w-4 h-4" />
+              Réinitialiser
+            </button>
+          )}
+        </div>
+      </Card>
+
+      {/* KPIs filtrés */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard title="Total tickets" value={stats?.total || 0} icon={<TicketIcon className="w-6 h-6" />} color="purple" />
-        <KPICard title="Taux SLA" value={`${stats?.total ? Math.round(((stats.total - (stats.slaBreached || 0)) / stats.total) * 100) : 0}%`} icon={<Target className="w-6 h-6" />} color="green" trend={{ value: 5, isPositive: true }} />
-        <KPICard title="Temps moyen" value={stats?.avgResolutionTime ? `${Math.round(stats.avgResolutionTime / 60)}h` : 'N/A'} icon={<Timer className="w-6 h-6" />} color="blue" />
-        <KPICard title="SLA dépassés" value={stats?.slaBreached || 0} icon={<AlertTriangle className="w-6 h-6" />} color="red" />
+        <KPICard title="Total filtré" value={filteredStats.total} icon={<TicketIcon className="w-6 h-6" />} color="purple" subtitle={dateRange === 'all' ? 'Historique complet' : `${dateRange.replace('d', ' jours').replace('y', ' an')}`} />
+        <KPICard title="Taux SLA" value={`${slaRate}%`} icon={<Target className="w-6 h-6" />} color="green" subtitle="Respect des délais" />
+        <KPICard title="Temps moyen" value={filteredStats.avgResolutionTime > 0 ? `${Math.round(filteredStats.avgResolutionTime / 60)}h` : 'N/A'} icon={<Timer className="w-6 h-6" />} color="blue" subtitle="Résolution" />
+        <KPICard title="SLA dépassés" value={filteredStats.slaBreached} icon={<AlertTriangle className="w-6 h-6" />} color="red" subtitle="Hors délai" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Graphiques visuels - Donut Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Donut - Par statut */}
         <Card className="p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Répartition par statut</h3>
-          <div className="space-y-4">
-            {Object.entries(STATUS_LABELS).map(([status, label]) => {
-              const count = stats?.byStatus?.[status as TicketStatus] || 0;
-              const total = stats?.total || 1;
-              const percentage = (count / total) * 100;
-              return (
-                <div key={status}>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">{label}</span>
-                    <span className="font-semibold">{count}</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-700 ${getStatusColor(status as TicketStatus).split(' ')[0]}`} style={{ width: `${percentage}%` }} />
-                  </div>
-                </div>
-              );
-            })}
+          <h3 className="font-semibold text-gray-900 mb-4 text-center">Répartition par statut</h3>
+          <DonutChart
+            data={[
+              { label: 'Ouvert', value: filteredStats.byStatus['OPEN'] || 0, color: '#3b82f6' },
+              { label: 'En cours', value: filteredStats.byStatus['IN_PROGRESS'] || 0, color: '#f59e0b' },
+              { label: 'Attente', value: filteredStats.byStatus['WAITING_CUSTOMER'] || 0, color: '#8b5cf6' },
+              { label: 'Résolu', value: filteredStats.byStatus['RESOLVED'] || 0, color: '#22c55e' },
+              { label: 'Fermé', value: filteredStats.byStatus['CLOSED'] || 0, color: '#6b7280' },
+              { label: 'Escaladé', value: filteredStats.byStatus['ESCALATED'] || 0, color: '#ef4444' },
+            ].filter(d => d.value > 0)}
+            centerValue={filteredStats.total}
+            centerLabel="tickets"
+          />
+        </Card>
+
+        {/* Donut - Par priorité */}
+        <Card className="p-6">
+          <h3 className="font-semibold text-gray-900 mb-4 text-center">Répartition par priorité</h3>
+          <DonutChart
+            data={[
+              { label: 'Basse', value: filteredStats.byPriority['LOW'] || 0, color: '#9ca3af' },
+              { label: 'Moyenne', value: filteredStats.byPriority['MEDIUM'] || 0, color: '#3b82f6' },
+              { label: 'Haute', value: filteredStats.byPriority['HIGH'] || 0, color: '#f97316' },
+              { label: 'Urgente', value: filteredStats.byPriority['URGENT'] || 0, color: '#ef4444' },
+            ].filter(d => d.value > 0)}
+            centerValue={`${slaRate}%`}
+            centerLabel="SLA OK"
+          />
+        </Card>
+
+        {/* Donut - Par type */}
+        <Card className="p-6">
+          <h3 className="font-semibold text-gray-900 mb-4 text-center">Répartition par type</h3>
+          <DonutChart
+            data={[
+              { label: 'Technique', value: filteredStats.byIssueType['TECHNICAL'] || 0, color: '#8b5cf6' },
+              { label: 'Livraison', value: filteredStats.byIssueType['DELIVERY'] || 0, color: '#3b82f6' },
+              { label: 'Facturation', value: filteredStats.byIssueType['BILLING'] || 0, color: '#22c55e' },
+              { label: 'Autre', value: filteredStats.byIssueType['OTHER'] || 0, color: '#6b7280' },
+            ].filter(d => d.value > 0)}
+            centerValue={filteredStats.resolvedCount}
+            centerLabel="résolus"
+          />
+        </Card>
+      </div>
+
+      {/* Graphiques barres et tendances */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Bar Chart - Priorité */}
+        <Card className="p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Tickets par priorité</h3>
+          <div className="flex justify-center">
+            <VerticalBarChart
+              data={[
+                { label: 'Basse', value: filteredStats.byPriority['LOW'] || 0, color: '#9ca3af' },
+                { label: 'Moyenne', value: filteredStats.byPriority['MEDIUM'] || 0, color: '#3b82f6' },
+                { label: 'Haute', value: filteredStats.byPriority['HIGH'] || 0, color: '#f97316' },
+                { label: 'Urgente', value: filteredStats.byPriority['URGENT'] || 0, color: '#ef4444' },
+              ]}
+              width={320}
+              height={200}
+            />
           </div>
         </Card>
 
+        {/* Tendance tickets par jour */}
         <Card className="p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Répartition par type</h3>
-          <div className="space-y-4">
-            {Object.entries(ISSUE_TYPE_LABELS).map(([type, label]) => {
-              const count = stats?.byIssueType?.[type as IssueType] || 0;
-              const total = stats?.total || 1;
-              const percentage = (count / total) * 100;
-              return (
-                <div key={type}>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">{label}</span>
-                    <span className="font-semibold">{count}</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-indigo-500 transition-all duration-700" style={{ width: `${percentage}%` }} />
-                  </div>
-                </div>
-              );
-            })}
+          <h3 className="font-semibold text-gray-900 mb-4">Tendance des tickets (7 derniers jours)</h3>
+          <div className="flex justify-center">
+            <AreaLineChart
+              data={(() => {
+                const days = [];
+                const now = new Date();
+                for (let i = 6; i >= 0; i--) {
+                  const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+                  const dayStr = date.toLocaleDateString('fr-FR', { weekday: 'short' });
+                  const count = filteredTickets.filter(t => {
+                    const ticketDate = new Date(t.createdAt);
+                    return ticketDate.toDateString() === date.toDateString();
+                  }).length;
+                  days.push({ label: dayStr, value: count });
+                }
+                return days;
+              })()}
+              width={350}
+              height={180}
+              color="#8b5cf6"
+              gradientId="trendGradient"
+            />
           </div>
         </Card>
+
+        {/* Performance agents - Horizontal bars */}
+        <Card className="p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Charge par agent</h3>
+          {agents.length > 0 ? (
+            <HorizontalBarChart
+              data={agents.slice(0, 5).map((agent, i) => ({
+                label: agent.displayName,
+                value: filteredStats.byAgent[agent.id] || 0,
+                color: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444'][i % 5],
+                percent: filteredStats.total > 0 ? Math.round(((filteredStats.byAgent[agent.id] || 0) / filteredStats.total) * 100) : 0,
+              }))}
+            />
+          ) : (
+            <p className="text-gray-500 text-sm text-center py-8">Aucun agent trouvé</p>
+          )}
+        </Card>
+
+        {/* Types de problèmes - Horizontal bars */}
+        <Card className="p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Types de problèmes</h3>
+          <HorizontalBarChart
+            data={[
+              { label: 'Technique', value: filteredStats.byIssueType['TECHNICAL'] || 0, color: '#8b5cf6', percent: filteredStats.total > 0 ? Math.round(((filteredStats.byIssueType['TECHNICAL'] || 0) / filteredStats.total) * 100) : 0 },
+              { label: 'Livraison', value: filteredStats.byIssueType['DELIVERY'] || 0, color: '#3b82f6', percent: filteredStats.total > 0 ? Math.round(((filteredStats.byIssueType['DELIVERY'] || 0) / filteredStats.total) * 100) : 0 },
+              { label: 'Facturation', value: filteredStats.byIssueType['BILLING'] || 0, color: '#22c55e', percent: filteredStats.total > 0 ? Math.round(((filteredStats.byIssueType['BILLING'] || 0) / filteredStats.total) * 100) : 0 },
+              { label: 'Autre', value: filteredStats.byIssueType['OTHER'] || 0, color: '#6b7280', percent: filteredStats.total > 0 ? Math.round(((filteredStats.byIssueType['OTHER'] || 0) / filteredStats.total) * 100) : 0 },
+            ]}
+          />
+        </Card>
+      </div>
+
+      {/* Métriques détaillées */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-blue-600 font-medium">Tickets ouverts</p>
+              <p className="text-2xl font-bold text-blue-900">{(filteredStats.byStatus['OPEN'] || 0) + (filteredStats.byStatus['REOPENED'] || 0)}</p>
+            </div>
+            <Sparkline data={[3, 5, 4, 7, 6, 8, (filteredStats.byStatus['OPEN'] || 0)]} color="#3b82f6" />
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-amber-50 to-orange-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-amber-600 font-medium">En traitement</p>
+              <p className="text-2xl font-bold text-amber-900">{filteredStats.byStatus['IN_PROGRESS'] || 0}</p>
+            </div>
+            <Sparkline data={[2, 4, 3, 5, 4, 6, (filteredStats.byStatus['IN_PROGRESS'] || 0)]} color="#f59e0b" />
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-green-50 to-emerald-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-green-600 font-medium">Résolus</p>
+              <p className="text-2xl font-bold text-green-900">{filteredStats.resolvedCount}</p>
+            </div>
+            <Sparkline data={[5, 7, 6, 8, 9, 7, filteredStats.resolvedCount]} color="#22c55e" />
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-red-50 to-rose-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-red-600 font-medium">SLA dépassés</p>
+              <p className="text-2xl font-bold text-red-900">{filteredStats.slaBreached}</p>
+            </div>
+            <Sparkline data={[1, 2, 1, 3, 2, 1, filteredStats.slaBreached]} color="#ef4444" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Tableau récapitulatif */}
+      <Card className="overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Détail des tickets filtrés</h3>
+          <span className="text-sm text-gray-500">{filteredStats.total} résultats</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">N°</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Titre</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Priorité</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Agent</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredTickets.slice(0, 10).map(t => (
+                <tr key={t.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">#{t.ticketRef || t.ticketNumber || t.id.slice(0, 6)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700 max-w-[200px] truncate">{t.title}</td>
+                  <td className="px-4 py-3"><Badge className={getStatusColor(t.status)}>{STATUS_LABELS[t.status]}</Badge></td>
+                  <td className="px-4 py-3"><Badge className={getPriorityColor(t.priority)}>{PRIORITY_LABELS[t.priority]}</Badge></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{ISSUE_TYPE_LABELS[t.issueType]}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{t.assignedTo?.displayName || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(t.createdAt).toLocaleDateString('fr-FR')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredTickets.length > 10 && (
+            <div className="p-4 text-center text-sm text-gray-500 bg-gray-50">
+              + {filteredTickets.length - 10} autres tickets • Exportez pour voir la liste complète
+            </div>
+          )}
+          {filteredTickets.length === 0 && (
+            <div className="p-8 text-center text-gray-500">
+              <BarChart3 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p>Aucun ticket ne correspond aux filtres sélectionnés</p>
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ============================================
+// GENERAL SETTINGS TAB (Language & Theme)
+// ============================================
+
+// Theme preview styles - uses THEME_STYLES for consistency
+const getThemePreview = (key: AppTheme) => ({
+  sidebar: THEME_STYLES[key].sidebarBg,
+  logo: THEME_STYLES[key].logoBg,
+});
+
+const GeneralSettingsTab: React.FC = () => {
+  const { appTheme, setAppTheme, appLanguage, setAppLanguage, t } = useAdmin();
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-lg font-semibold text-gray-900">{t('settings.general')}</h2>
+
+      {/* Language Selection */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-1">{t('settings.language')}</h3>
+          <p className="text-xs text-gray-500 mb-3">{t('settings.languageDesc')}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 max-w-md">
+          {([
+            { code: 'fr' as AppLanguage, name: 'Français', flag: '🇫🇷' },
+            { code: 'en' as AppLanguage, name: 'English', flag: '🇬🇧' },
+          ]).map(({ code, name, flag }) => (
+            <button
+              key={code}
+              onClick={() => setAppLanguage(code)}
+              className={`p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2
+                ${appLanguage === code
+                  ? 'border-blue-500 bg-blue-50 shadow-md'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+            >
+              <span className="text-3xl">{flag}</span>
+              <span className={`text-sm font-medium ${appLanguage === code ? 'text-blue-700' : 'text-gray-700'}`}>
+                {name}
+              </span>
+              {appLanguage === code && (
+                <CheckCircle className="w-4 h-4 text-blue-500" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Theme Selection */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-1">{t('settings.theme')}</h3>
+          <p className="text-xs text-gray-500 mb-3">{t('settings.themeDesc')}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          {(['classic', 'blue', 'green'] as AppTheme[]).map((key) => {
+            const themeInfo = THEME_STYLES[key];
+            const preview = getThemePreview(key);
+            return (
+              <button
+                key={key}
+                onClick={() => setAppTheme(key)}
+                className={`p-4 rounded-xl border-2 transition-all duration-200
+                  ${appTheme === key
+                    ? 'border-blue-500 shadow-lg scale-105'
+                    : 'border-gray-200 hover:border-gray-300'
+                  }`}
+              >
+                {/* Theme preview with inline styles */}
+                <div
+                  className={`h-16 rounded-lg mb-3 flex items-center justify-center ${themeInfo.isLight ? 'border border-gray-200' : ''}`}
+                  style={{ background: preview.sidebar }}
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shadow-lg"
+                    style={{ background: preview.logo }}
+                  >
+                    <Wrench className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                <span className={`text-sm font-medium ${appTheme === key ? 'text-blue-700' : 'text-gray-700'}`}>
+                  {themeInfo.name}
+                </span>
+                <span className="block text-xs text-gray-500 mt-1">{themeInfo.description}</span>
+                {appTheme === key && (
+                  <div className="flex justify-center mt-2">
+                    <CheckCircle className="w-4 h-4 text-blue-500" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Company Info (read-only for now) */}
+      <div className="space-y-4 pt-4 border-t border-gray-200">
+        <h3 className="text-sm font-semibold text-gray-800">Informations entreprise</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-medium text-gray-500">Nom de l'entreprise</label>
+            <Input value="KLY GROUPE" className="mt-1" readOnly />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500">Email support</label>
+            <Input value="support@kly.fr" className="mt-1" readOnly />
+          </div>
+        </div>
+      </div>
+
+      <div className="text-xs text-gray-400">
+        Les changements de langue et de thème sont appliqués immédiatement et sauvegardés automatiquement.
       </div>
     </div>
   );
@@ -6157,9 +7511,9 @@ const SettingsView: React.FC = () => {
     <div className="p-6 space-y-6">
       <h1 className="text-xl font-bold text-gray-900">Paramètres</h1>
 
-      <div className="flex gap-6">
-        <Card className="w-64 p-4 h-fit">
-          <nav className="space-y-1">
+      <div className="flex flex-col lg:flex-row gap-6">
+        <Card className="w-full lg:w-64 p-4 h-fit overflow-x-auto">
+          <nav className="flex lg:flex-col gap-1 lg:gap-0 lg:space-y-1 min-w-max lg:min-w-0">
             {[
               { id: 'profile', label: 'Mon profil', icon: <User className="w-4 h-4" /> },
               { id: 'security', label: 'Sécurité', icon: <Shield className="w-4 h-4" /> },
@@ -6314,20 +7668,7 @@ const SettingsView: React.FC = () => {
           )}
 
           {activeTab === 'general' && (
-            <div className="space-y-6 max-w-lg">
-              <h2 className="text-lg font-semibold">Paramètres généraux</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Nom de l'entreprise</label>
-                  <Input value="KLY GROUPE" className="mt-2" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Email support</label>
-                  <Input value="support@kly.fr" className="mt-2" />
-                </div>
-                <Button variant="primary"><Save className="w-4 h-4 mr-2" />Enregistrer</Button>
-              </div>
-            </div>
+            <GeneralSettingsTab />
           )}
 
           {activeTab === 'sla' && (
@@ -6399,7 +7740,32 @@ const AdminV2: React.FC = () => {
   const [currentView, setCurrentView] = useState('dashboard');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+
+  // App settings (persisted in localStorage)
+  const [appTheme, setAppTheme] = useState<AppTheme>(() => {
+    const saved = localStorage.getItem('kly_app_theme');
+    return (saved as AppTheme) || 'blue';
+  });
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>(() => {
+    const saved = localStorage.getItem('kly_app_language');
+    return (saved as AppLanguage) || 'fr';
+  });
+
+  // Persist theme and language changes
+  useEffect(() => {
+    localStorage.setItem('kly_app_theme', appTheme);
+  }, [appTheme]);
+
+  useEffect(() => {
+    localStorage.setItem('kly_app_language', appLanguage);
+  }, [appLanguage]);
+
+  // Translation function
+  const t = useCallback((key: string): string => {
+    return TRANSLATIONS[appLanguage]?.[key] || TRANSLATIONS.fr[key] || key;
+  }, [appLanguage]);
 
   // Data state
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -6591,7 +7957,6 @@ const AdminV2: React.FC = () => {
 
       // Handle users
       if (usersResult.status === 'fulfilled') {
-        console.log('[AdminV2] Users loaded:', usersResult.value?.length || 0, usersResult.value);
         setUsers(usersResult.value || []);
       } else {
         console.error('Erreur chargement users:', usersResult.reason);
@@ -6728,6 +8093,7 @@ const AdminV2: React.FC = () => {
         currentView, setCurrentView,
         selectedTicket, setSelectedTicket,
         sidebarOpen, setSidebarOpen,
+        sidebarCollapsed, setSidebarCollapsed,
         notifications,
         unreadNotifications,
         unreadByTicket,
@@ -6742,7 +8108,10 @@ const AdminV2: React.FC = () => {
         stats,
         refreshData,
         isLoading: dataLoading,
-        autoAssignTickets
+        autoAssignTickets,
+        appTheme, setAppTheme,
+        appLanguage, setAppLanguage,
+        t
       }}>
         <div className="flex h-screen bg-gray-50">
           <Sidebar />

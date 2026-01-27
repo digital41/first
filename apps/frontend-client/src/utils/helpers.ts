@@ -64,9 +64,14 @@ export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-// Ticket number formatting - Format: SAV-XXXXX
-export function formatTicketNumber(number: string | number): string {
-  const num = typeof number === 'string' ? parseInt(number, 10) : number;
+// Ticket number formatting - Format: SAV-XX-XXXX (année-numéro) ou SAV-XXXXX pour les anciens
+export function formatTicketNumber(numberOrRef: string | number): string {
+  // Si c'est déjà un ticketRef au format YY-XXXX, le préfixer avec SAV-
+  if (typeof numberOrRef === 'string' && /^\d{2}-\d{4,}$/.test(numberOrRef)) {
+    return `SAV-${numberOrRef}`;
+  }
+  // Sinon, c'est un ancien format numérique
+  const num = typeof numberOrRef === 'string' ? parseInt(numberOrRef, 10) : numberOrRef;
   return `SAV-${String(num).padStart(5, '0')}`;
 }
 

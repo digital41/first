@@ -120,14 +120,13 @@ export function Header({ onMenuToggle, isMobileMenuOpen }: HeaderProps) {
                       ))
                     )}
                   </div>
-                  {Array.isArray(notifications) && notifications.length > 5 && (
-                    <Link
-                      to="/notifications"
-                      className="block px-4 py-2 text-center text-sm text-primary-600 hover:text-primary-700 border-t border-gray-200"
-                    >
-                      Voir toutes les notifications
-                    </Link>
-                  )}
+                  <Link
+                    to="/notifications"
+                    onClick={() => setShowNotifications(false)}
+                    className="block px-4 py-2 text-center text-sm text-primary-600 hover:text-primary-700 border-t border-gray-200"
+                  >
+                    Voir toutes les notifications
+                  </Link>
                 </div>
               )}
             </div>

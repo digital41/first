@@ -115,6 +115,7 @@ export interface OrderLine {
 export interface Ticket {
   id: string;
   ticketNumber: string;
+  ticketRef?: string; // Format: 26-0001 (année-numéro)
   title: string;
   description: string;
   status: TicketStatus;
