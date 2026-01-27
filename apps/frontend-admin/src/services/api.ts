@@ -233,6 +233,9 @@ export const AdminApi = {
     if (filters.page) params.set('page', filters.page.toString());
     if (filters.limit) params.set('limit', filters.limit.toString());
     if (filters.status) params.set('status', filters.status);
+    if (filters.excludeStatus && filters.excludeStatus.length > 0) {
+      params.set('excludeStatus', filters.excludeStatus.join(','));
+    }
     if (filters.issueType) params.set('issueType', filters.issueType);
     if (filters.priority) params.set('priority', filters.priority);
     if (filters.assignedToId) params.set('assignedToId', filters.assignedToId);
@@ -272,6 +275,56 @@ export const AdminApi = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  // ==========================================
+  // TRANSFERT DE TICKETS
+  // ==========================================
+
+  async requestTransfer(ticketId: string, toAgentId: string, reason?: string): Promise<{
+    id: string;
+    ticketId: string;
+    toAgentId: string;
+  }> {
+    return fetchWithAuth<{ id: string; ticketId: string; toAgentId: string }>(`/admin/tickets/${ticketId}/transfer`, {
+      method: 'POST',
+      body: JSON.stringify({ toAgentId, reason }),
+    });
+  },
+
+  async acceptTransfer(transferId: string): Promise<Ticket> {
+    return fetchWithAuth<Ticket>(`/admin/transfers/${transferId}/accept`, {
+      method: 'POST',
+    });
+  },
+
+  async declineTransfer(transferId: string, reason?: string): Promise<void> {
+    await fetchWithAuth<void>(`/admin/transfers/${transferId}/decline`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async getPendingTransfers(): Promise<Array<{
+    id: string;
+    ticketId: string;
+    ticketNumber: number;
+    ticketTitle: string;
+    fromAgentId: string;
+    fromAgentName: string;
+    reason?: string;
+    createdAt: string;
+  }>> {
+    return fetchWithAuth<Array<{
+      id: string;
+      ticketId: string;
+      ticketNumber: number;
+      ticketTitle: string;
+      fromAgentId: string;
+      fromAgentName: string;
+      reason?: string;
+      createdAt: string;
+    }>>('/admin/transfers/pending');
   },
 
   // ==========================================
@@ -316,10 +369,23 @@ export const AdminApi = {
     if (filters?.status) params.set('status', filters.status);
     if (filters?.search) params.set('search', filters.search);
     const query = params.toString() ? `?${params.toString()}` : '';
-    const response = await fetchWithAuth<{ users: User[]; data?: User[] } | User[]>(`/admin/users${query}`);
+    const response = await fetchWithAuth<{ users: User[]; data?: User[]; pagination?: unknown } | User[]>(`/admin/users${query}`);
+
+    // Handle different response formats
     if (Array.isArray(response)) return response;
-    // Backend returns { users, pagination } or { data }
-    return response.users || response.data || [];
+
+    // Backend returns { users, pagination }
+    if (response && typeof response === 'object') {
+      if ('users' in response && Array.isArray(response.users)) {
+        return response.users;
+      }
+      if ('data' in response && Array.isArray(response.data)) {
+        return response.data;
+      }
+    }
+
+    console.warn('[API] Unexpected getUsers response format:', response);
+    return [];
   },
 
   async getUserById(userId: string): Promise<User> {
@@ -379,6 +445,61 @@ export const AdminApi = {
       activeTickets: number;
       slaComplianceRate: number;
     };
+  },
+
+  // ==========================================
+  // CLIENTS SAV (Admin)
+  // ==========================================
+
+  async getClientsWithTickets(params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    clients: Array<{
+      id: string;
+      email: string;
+      phone: string | null;
+      displayName: string;
+      createdAt: string;
+      lastSeenAt: string | null;
+      isActive: boolean;
+      totalTickets: number;
+      openTickets: number;
+      lastTicket: {
+        id: string;
+        ticketNumber: number;
+        title: string;
+        status: string;
+        priority: string;
+        createdAt: string;
+      } | null;
+      recentTickets: Array<{
+        id: string;
+        ticketNumber: number;
+        title: string;
+        status: string;
+        priority: string;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.set('search', params.search);
+    if (params?.page) queryParams.set('page', params.page.toString());
+    if (params?.limit) queryParams.set('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    const url = `/admin/clients${queryString ? `?${queryString}` : ''}`;
+
+    return fetchWithAuth(url);
   },
 
   // ==========================================
@@ -769,6 +890,133 @@ export const AdminApi = {
     }>(`/admin/ai/summary/${ticketId}`, {
       method: 'POST',
     });
+  },
+
+  /**
+   * Suggestion IA avec streaming (réponse progressive)
+   * Retourne un EventSource-like pour gérer les chunks
+   */
+  getAISuggestionStream(
+    ticketId: string,
+    query?: string,
+    onChunk: (text: string) => void = () => {},
+    onDone: () => void = () => {},
+    onError: (error: string) => void = () => {}
+  ): { abort: () => void } {
+    const controller = new AbortController();
+    const token = TokenStorage.getAccessToken();
+
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/admin/ai/suggest-stream/${ticketId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ query }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          onError('Erreur de connexion au service IA');
+          return;
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          onError('Streaming non supporté');
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'chunk' && data.content) {
+                  onChunk(data.content);
+                } else if (data.type === 'done') {
+                  onDone();
+                } else if (data.type === 'error') {
+                  onError(data.error || 'Erreur IA');
+                }
+              } catch {
+                // Ignorer les lignes mal formées
+              }
+            }
+          }
+        }
+
+        onDone();
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          onError('Erreur de connexion');
+        }
+      }
+    })();
+
+    return {
+      abort: () => controller.abort(),
+    };
+  },
+
+  // ==========================================
+  // AI AUTOBOT (Statistiques et conversations)
+  // ==========================================
+
+  /**
+   * Récupère les statistiques de l'AI AutoBot
+   */
+  async getAutoBotStats(): Promise<{
+    ticketsHandled: number;
+    ticketsResolved: number;
+    avgResponseTime: string;
+    satisfactionRate: number;
+    currentlyActive: number;
+  }> {
+    return fetchWithAuth<{
+      ticketsHandled: number;
+      ticketsResolved: number;
+      avgResponseTime: string;
+      satisfactionRate: number;
+      currentlyActive: number;
+    }>('/ai/autobot/stats');
+  },
+
+  /**
+   * Récupère les conversations IA récentes
+   */
+  async getAutoBotConversations(limit = 10): Promise<Array<{
+    id: string;
+    ticketId: string;
+    ticketNumber: number;
+    ticketTitle: string;
+    status: 'resolved' | 'escalated' | 'active';
+    messages: number;
+    resolvedWithoutHuman: boolean;
+    lastActivity: string;
+  }>> {
+    return fetchWithAuth<Array<{
+      id: string;
+      ticketId: string;
+      ticketNumber: number;
+      ticketTitle: string;
+      status: 'resolved' | 'escalated' | 'active';
+      messages: number;
+      resolvedWithoutHuman: boolean;
+      lastActivity: string;
+    }>>(`/ai/autobot/conversations?limit=${limit}`);
   },
 
   /**

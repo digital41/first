@@ -8,15 +8,14 @@ import {
   ThumbsDown,
   RotateCcw,
   Minimize2,
-  Maximize2,
   X,
   MessageSquare,
   Lightbulb,
-  ArrowRight
+  ArrowRight,
+  Ticket,
+  CheckCircle2
 } from 'lucide-react';
-import { geminiService, ChatMessage, SageContext } from '@/services/geminiService';
-import { ordersApi } from '@/services/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { geminiService, ChatMessage } from '@/services/geminiService';
 import { cn } from '@/utils/helpers';
 
 interface SmartAssistantProps {
@@ -35,14 +34,14 @@ const QUICK_ACTIONS = [
   { id: 'commercial', label: 'Question produit', icon: '🛒' },
   { id: 'status', label: 'Suivi commande', icon: '📦' },
   { id: 'technical', label: 'Support technique', icon: '🔧' },
-  { id: 'invoice', label: 'Facturation', icon: '💰' },
+  { id: 'general', label: 'Question générale', icon: '🌐' },
 ];
 
 const SUGGESTIONS = [
   'Quel produit me conseilles-tu pour... ?',
   'Où en est ma commande ?',
   'Mon équipement affiche une erreur',
-  'J\'ai besoin de ma facture',
+  'Comment fonctionne un compresseur ?',
 ];
 
 export function SmartAssistant({
@@ -53,49 +52,17 @@ export function SmartAssistant({
   minimized = false,
   onToggleMinimize
 }: SmartAssistantProps) {
-  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [sageData, setSageData] = useState<SageContext | null>(null);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  const [createdTicketNumber, setCreatedTicketNumber] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load SAGE orders for context
-  useEffect(() => {
-    const loadSageData = async () => {
-      if (!user) return;
-      try {
-        const orders = await ordersApi.getAll(1, 20); // Get last 20 orders
-        setSageData({
-          customerName: user.displayName || user.email,
-          customerCode: user.customerCode,
-          orders: orders.map(o => ({
-            orderNumber: o.orderNumber,
-            status: o.status,
-            totalAmount: o.totalAmount,
-            orderDate: o.orderDate,
-            items: o.lines?.map(l => ({
-              productName: l.productName,
-              quantity: l.quantity,
-              unitPrice: l.unitPrice
-            })) || o.items?.map(i => ({
-              productName: i.productName,
-              quantity: i.quantity,
-              unitPrice: i.unitPrice
-            }))
-          }))
-        });
-      } catch (error) {
-        console.warn('Could not load SAGE data for Lumo:', error);
-      }
-    };
-    loadSageData();
-  }, [user]);
-
-  // Initialize Gemini
+  // Initialize AI service (SAGE data is now loaded server-side for security)
   useEffect(() => {
     const init = async () => {
       const success = await geminiService.initialize();
@@ -106,7 +73,7 @@ export function SmartAssistant({
         setMessages([
           {
             role: 'assistant',
-            content: `Bonjour ! Je suis **Lumo**, votre assistant intelligent KLY Groupe. ✨\n\nJe suis là pour vous accompagner sur :\n• **Questions commerciales** - produits, tarifs, disponibilités\n• **Suivi client Sage** - commandes, livraisons, factures\n• **Support technique** - dépannage, codes erreur, guides\n\n**Comment puis-je vous aider aujourd'hui ?**`,
+            content: `Bonjour ! Je suis **Lumo**, votre assistant intelligent KLY Groupe. ✨\n\nJe suis là pour vous accompagner sur :\n• **Questions commerciales** - produits, tarifs, disponibilités\n• **Suivi client Sage** - commandes, livraisons, factures\n• **Support technique** - dépannage, codes erreur, guides\n• **Questions générales** - équipements industriels, conseils\n\n**Comment puis-je vous aider aujourd'hui ?**`,
             timestamp: new Date()
           }
         ]);
@@ -144,11 +111,8 @@ export function SmartAssistant({
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Pass SAGE data to Lumo for real data access
-      const response = await geminiService.chat(messageText, {
-        ...orderContext,
-        sageData: sageData || undefined
-      });
+      // Call backend API (SAGE data is fetched securely server-side)
+      const response = await geminiService.chat(messageText, orderContext);
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -197,7 +161,7 @@ export function SmartAssistant({
       commercial: 'J\'ai une question sur vos produits',
       status: 'Où en est ma commande ?',
       technical: 'J\'ai un problème technique avec mon équipement',
-      invoice: 'J\'ai besoin d\'une facture'
+      general: 'J\'ai une question générale sur les équipements industriels'
     };
     handleSend(quickMessages[actionId]);
   };
@@ -214,6 +178,51 @@ export function SmartAssistant({
     });
   };
 
+  // Créer un ticket automatiquement via LUMO
+  const handleCreateTicket = async () => {
+    if (isCreatingTicket || messages.length < 2) return;
+
+    setIsCreatingTicket(true);
+
+    // Ajouter un message de LUMO indiquant qu'il crée le ticket
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: '📝 Je crée votre ticket SAV... J\'analyse notre conversation pour transmettre toutes les informations utiles à l\'équipe technique.',
+      timestamp: new Date()
+    }]);
+
+    try {
+      const result = await geminiService.createTicket();
+
+      if (result.success && result.ticketNumber) {
+        setCreatedTicketNumber(result.ticketNumber);
+        // Utiliser la réponse contextuelle générée par l'IA
+        const responseContent = result.contextualResponse ||
+          `✅ **Ticket ${result.ticketNumber} créé avec succès !**\n\nUn technicien va analyser votre demande et vous répondra rapidement.\n\n📧 Vous recevrez une notification dès qu'il y aura du nouveau.\n\n💡 Vous pouvez suivre l'avancement dans **"Mes tickets"**.`;
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date()
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ Désolé, je n'ai pas pu créer le ticket automatiquement.\n\n${result.error || 'Veuillez réessayer ou créer un ticket manuellement.'}\n\n👉 Vous pouvez toujours créer un ticket dans le menu **"Nouveau ticket"**.`,
+          timestamp: new Date()
+        }]);
+      }
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '❌ Oups, une erreur s\'est produite. Vous pouvez créer un ticket manuellement dans le menu **"Nouveau ticket"**.',
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsCreatingTicket(false);
+    }
+  };
+
   const handleReset = () => {
     geminiService.clearHistory();
     setMessages([{
@@ -222,6 +231,8 @@ export function SmartAssistant({
       timestamp: new Date()
     }]);
     setShowSuggestions(true);
+    setCreatedTicketNumber(null);
+    setIsCreatingTicket(false);
   };
 
   const handleFeedback = (messageIndex: number, isPositive: boolean) => {
@@ -401,17 +412,47 @@ export function SmartAssistant({
         </div>
       )}
 
-      {/* Escalate button */}
-      {messages.length > 4 && (
-        <div className="px-3 sm:px-4 py-2 border-t border-gray-100 bg-orange-50 shrink-0">
-          <button
-            onClick={handleEscalate}
-            className="w-full flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-orange-700 hover:bg-orange-100 rounded-lg transition-colors"
-          >
-            <MessageSquare size={14} className="mr-1.5 sm:mr-2 shrink-0" />
-            <span className="truncate">Parler à un conseiller humain</span>
-            <ArrowRight size={12} className="ml-1.5 sm:ml-2 shrink-0" />
-          </button>
+      {/* Ticket creation / Escalate buttons */}
+      {messages.length > 3 && !createdTicketNumber && (
+        <div className="px-3 sm:px-4 py-2 border-t border-gray-100 bg-gradient-to-r from-primary-50 to-orange-50 shrink-0">
+          <div className="flex gap-2">
+            {/* Bouton création ticket automatique par LUMO */}
+            <button
+              onClick={handleCreateTicket}
+              disabled={isCreatingTicket}
+              className="flex-1 flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-primary-700 bg-white border border-primary-200 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isCreatingTicket ? (
+                <>
+                  <Loader2 size={14} className="mr-1.5 animate-spin shrink-0" />
+                  <span className="truncate">Création...</span>
+                </>
+              ) : (
+                <>
+                  <Ticket size={14} className="mr-1.5 shrink-0" />
+                  <span className="truncate">Créer un ticket</span>
+                </>
+              )}
+            </button>
+            {/* Bouton escalade vers humain */}
+            <button
+              onClick={handleEscalate}
+              className="flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-orange-700 bg-white border border-orange-200 hover:bg-orange-50 rounded-lg transition-colors"
+            >
+              <MessageSquare size={14} className="mr-1.5 shrink-0" />
+              <span className="hidden sm:inline truncate">Conseiller</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Ticket créé avec succès */}
+      {createdTicketNumber && (
+        <div className="px-3 sm:px-4 py-2 border-t border-gray-100 bg-green-50 shrink-0">
+          <div className="flex items-center justify-center text-green-700 text-xs sm:text-sm">
+            <CheckCircle2 size={16} className="mr-2 shrink-0" />
+            <span>Ticket <strong>{createdTicketNumber}</strong> créé</span>
+          </div>
         </div>
       )}
 

@@ -16,7 +16,7 @@ import {
   File, FolderOpen, History,
   Workflow, FastForward, AlertCircle, Activity, Target,
   ShieldCheck, UserCog, Headphones, MoreHorizontal, ExternalLink,
-  Loader2
+  Loader2, UserCircle, ChevronLeft, Hash
 } from 'lucide-react';
 
 // Import des services API réels
@@ -133,12 +133,146 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
   'sms.customer': { label: 'SMS au client', icon: 'phone', color: 'green' },
 };
 
-// Quick responses templates
-const QUICK_RESPONSES = [
-  { id: '1', title: 'Accusé de réception', content: 'Bonjour,\n\nNous avons bien reçu votre demande et la traitons en priorité. Un technicien vous contactera sous peu.\n\nCordialement,\nÉquipe SAV KLY' },
-  { id: '2', title: 'Demande d\'informations', content: 'Bonjour,\n\nPour traiter votre demande, pourriez-vous nous fournir les informations suivantes :\n- Numéro de série de l\'équipement\n- Description détaillée du problème\n- Photos si possible\n\nMerci,\nÉquipe SAV KLY' },
-  { id: '3', title: 'Intervention planifiée', content: 'Bonjour,\n\nSuite à votre demande, une intervention a été planifiée. Notre technicien vous contactera pour confirmer le créneau.\n\nCordialement,\nÉquipe SAV KLY' },
-  { id: '4', title: 'Ticket résolu', content: 'Bonjour,\n\nVotre demande a été traitée avec succès. Si vous avez d\'autres questions, n\'hésitez pas à nous contacter.\n\nCordialement,\nÉquipe SAV KLY' },
+// Quick responses templates organisés par catégorie
+interface QuickResponse {
+  id: string;
+  title: string;
+  content: string;
+  category: 'accueil' | 'information' | 'technique' | 'cloture' | 'escalade';
+  shortcut?: string;
+  tags?: string[];
+}
+
+const QUICK_RESPONSE_CATEGORIES = {
+  accueil: { label: 'Accueil', icon: 'hand-wave', color: 'text-blue-600 bg-blue-50' },
+  information: { label: 'Informations', icon: 'info', color: 'text-amber-600 bg-amber-50' },
+  technique: { label: 'Technique', icon: 'wrench', color: 'text-purple-600 bg-purple-50' },
+  cloture: { label: 'Clôture', icon: 'check', color: 'text-green-600 bg-green-50' },
+  escalade: { label: 'Escalade', icon: 'alert', color: 'text-red-600 bg-red-50' },
+};
+
+const QUICK_RESPONSES: QuickResponse[] = [
+  // Accueil
+  {
+    id: '1',
+    category: 'accueil',
+    title: 'Accusé de réception',
+    shortcut: 'ar',
+    content: 'Bonjour {{customerName}},\n\nNous avons bien reçu votre demande concernant "{{ticketTitle}}" et la traitons en priorité.\n\nUn technicien vous contactera sous peu.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['accueil', 'réception']
+  },
+  {
+    id: '2',
+    category: 'accueil',
+    title: 'Prise en charge',
+    shortcut: 'pc',
+    content: 'Bonjour {{customerName}},\n\nJe prends en charge votre demande immédiatement. Je vais analyser la situation et vous recontacte très rapidement.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['accueil', 'prise en charge']
+  },
+
+  // Demande d'informations
+  {
+    id: '3',
+    category: 'information',
+    title: 'Demande d\'informations générales',
+    shortcut: 'di',
+    content: 'Bonjour {{customerName}},\n\nPour traiter votre demande efficacement, pourriez-vous nous fournir les informations suivantes :\n\n• Numéro de série de l\'équipement\n• Description détaillée du problème\n• Photos si possible\n\nMerci de votre coopération.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['information', 'détails']
+  },
+  {
+    id: '4',
+    category: 'information',
+    title: 'Demande numéro de série',
+    shortcut: 'ns',
+    content: 'Bonjour {{customerName}},\n\nPour identifier précisément votre équipement, pourriez-vous nous communiquer le numéro de série ?\n\nVous le trouverez généralement sur une étiquette à l\'arrière ou sous l\'appareil.\n\nMerci,\nÉquipe SAV KLY',
+    tags: ['série', 'identification']
+  },
+  {
+    id: '5',
+    category: 'information',
+    title: 'Demande de photos',
+    shortcut: 'ph',
+    content: 'Bonjour {{customerName}},\n\nPour mieux comprendre le problème, pourriez-vous nous envoyer quelques photos :\n\n• Une vue d\'ensemble de l\'équipement\n• Un gros plan sur la zone défaillante\n• Le code erreur affiché (si applicable)\n\nCela nous aidera à préparer l\'intervention.\n\nMerci,\nÉquipe SAV KLY',
+    tags: ['photos', 'images']
+  },
+
+  // Technique
+  {
+    id: '6',
+    category: 'technique',
+    title: 'Intervention planifiée',
+    shortcut: 'ip',
+    content: 'Bonjour {{customerName}},\n\nSuite à votre demande, une intervention a été planifiée.\n\nNotre technicien vous contactera pour confirmer le créneau horaire qui vous convient.\n\nMerci de vous assurer que l\'équipement est accessible.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['intervention', 'planification']
+  },
+  {
+    id: '7',
+    category: 'technique',
+    title: 'Solution à tester',
+    shortcut: 'st',
+    content: 'Bonjour {{customerName}},\n\nVoici une solution à tester avant notre intervention :\n\n1. Éteignez complètement l\'équipement\n2. Attendez 30 secondes\n3. Redémarrez l\'appareil\n\nSi le problème persiste, merci de nous le signaler.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['solution', 'redémarrage']
+  },
+  {
+    id: '8',
+    category: 'technique',
+    title: 'Pièce en commande',
+    shortcut: 'cmd',
+    content: 'Bonjour {{customerName}},\n\nSuite au diagnostic effectué, nous avons commandé la pièce nécessaire à la réparation.\n\nDélai de réception estimé : 3 à 5 jours ouvrés.\n\nNous vous recontacterons dès réception pour planifier l\'intervention.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['commande', 'pièce', 'délai']
+  },
+  {
+    id: '9',
+    category: 'technique',
+    title: 'Demande de garantie',
+    shortcut: 'gar',
+    content: 'Bonjour {{customerName}},\n\nPour vérifier la prise en charge sous garantie, pourriez-vous nous fournir :\n\n• La facture d\'achat ou le bon de livraison\n• La date d\'installation de l\'équipement\n\nMerci,\nÉquipe SAV KLY',
+    tags: ['garantie', 'facture']
+  },
+
+  // Clôture
+  {
+    id: '10',
+    category: 'cloture',
+    title: 'Ticket résolu',
+    shortcut: 'ok',
+    content: 'Bonjour {{customerName}},\n\nVotre demande a été traitée avec succès.\n\nN\'hésitez pas à nous recontacter si vous avez d\'autres questions.\n\nMerci de votre confiance.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['résolu', 'succès']
+  },
+  {
+    id: '11',
+    category: 'cloture',
+    title: 'Intervention terminée',
+    shortcut: 'it',
+    content: 'Bonjour {{customerName}},\n\nL\'intervention sur votre équipement a été réalisée avec succès.\n\nVotre appareil est maintenant opérationnel. Nous vous invitons à le tester et à nous signaler tout dysfonctionnement.\n\nMerci de votre confiance.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['intervention', 'terminée']
+  },
+  {
+    id: '12',
+    category: 'cloture',
+    title: 'Demande de feedback',
+    shortcut: 'fb',
+    content: 'Bonjour {{customerName}},\n\nNous espérons que notre intervention vous a donné satisfaction.\n\nVotre avis nous est précieux ! N\'hésitez pas à nous faire part de vos retours.\n\nMerci de votre confiance.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['feedback', 'satisfaction']
+  },
+
+  // Escalade
+  {
+    id: '13',
+    category: 'escalade',
+    title: 'Escalade technique',
+    shortcut: 'et',
+    content: 'Bonjour {{customerName}},\n\nVotre dossier nécessite une analyse approfondie par notre équipe technique spécialisée.\n\nJe transmets immédiatement votre demande à nos experts qui vous recontacteront dans les plus brefs délais.\n\nMerci de votre patience.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['escalade', 'expert']
+  },
+  {
+    id: '14',
+    category: 'escalade',
+    title: 'Retard intervention',
+    shortcut: 'ri',
+    content: 'Bonjour {{customerName}},\n\nJe vous prie de nous excuser pour ce retard dans le traitement de votre demande.\n\nNous mettons tout en œuvre pour résoudre votre problème au plus vite. Un responsable vous contactera personnellement.\n\nMerci de votre compréhension.\n\nCordialement,\nÉquipe SAV KLY',
+    tags: ['retard', 'excuse']
+  },
 ];
 
 // ============================================
@@ -607,13 +741,16 @@ const Sidebar: React.FC = () => {
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard className="w-5 h-5" />, permission: null },
     { id: 'tickets', label: 'Tickets SAV', icon: <TicketIcon className="w-5 h-5" />, permission: 'tickets' },
+    { id: 'clients', label: 'Liste des clients', icon: <UserCircle className="w-5 h-5" />, permission: 'tickets' },
     { id: 'team', label: 'Équipe', icon: <Users className="w-5 h-5" />, permission: 'team' },
     { id: 'automation', label: 'Automatisation', icon: <Workflow className="w-5 h-5" />, permission: 'automation' },
     { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, permission: 'reports' },
     { id: 'settings', label: 'Paramètres', icon: <Settings className="w-5 h-5" />, permission: 'settings' },
   ];
 
-  const filteredItems = menuItems.filter(i => !i.permission || hasPermission(i.permission) || hasPermission('*'));
+  // Filtrer les items selon les permissions - ADMIN a accès à tout via '*'
+  const isAdmin = user?.role === UserRole.ADMIN || user?.role === 'ADMIN';
+  const filteredItems = menuItems.filter(i => !i.permission || isAdmin || hasPermission(i.permission));
 
   return (
     <>
@@ -671,7 +808,23 @@ const Header: React.FC = () => {
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
+  const [notifTab, setNotifTab] = useState<'all' | 'messages' | 'sla' | 'system'>('all');
+  const [showAllNotifs, setShowAllNotifs] = useState(false); // Afficher toutes les notifications
   const unassignedCount = tickets.filter(t => !t.assignedToId && t.status !== 'CLOSED' && t.status !== 'RESOLVED').length;
+
+  // Filtrer les notifications selon l'onglet actif
+  const filteredNotifications = useMemo(() => {
+    switch (notifTab) {
+      case 'messages':
+        return notifications.filter(n => n.type === 'MESSAGE' || n.type === 'MENTION');
+      case 'sla':
+        return notifications.filter(n => n.type === 'SLA_WARNING' || n.type === 'SLA_BREACH');
+      case 'system':
+        return notifications.filter(n => n.type === 'SYSTEM' || n.type === 'ASSIGNMENT' || (!['MESSAGE', 'MENTION', 'SLA_WARNING', 'SLA_BREACH', 'TICKET_UPDATE'].includes(n.type)));
+      default:
+        return notifications;
+    }
+  }, [notifications, notifTab]);
 
   const handleAutoAssign = async () => {
     if (isAutoAssigning || unassignedCount === 0) return;
@@ -715,7 +868,7 @@ const Header: React.FC = () => {
         <Button variant="ghost" size="sm" onClick={() => setShowAIAssistant(true)} className="text-purple-600 hover:bg-purple-50">
           <Sparkles className="w-4 h-4 mr-2" /><span className="hidden sm:inline">Assistant IA</span>
         </Button>
-        <button className="relative p-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors" onClick={() => setShowNotifs(!showNotifs)}>
+        <button className="relative p-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors" onClick={() => { setShowNotifs(!showNotifs); if (showNotifs) setShowAllNotifs(false); }}>
           <Bell className="w-5 h-5" />
           {unreadNotifications > 0 && <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium animate-pulse">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span>}
         </button>
@@ -769,21 +922,52 @@ const Header: React.FC = () => {
 
           {/* Tabs for notification types */}
           <div className="flex border-b border-gray-100">
-            <button className="flex-1 px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">Toutes</button>
-            <button className="flex-1 px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Messages</button>
-            <button className="flex-1 px-4 py-2 text-sm text-gray-500 hover:text-gray-700">SLA</button>
-            <button className="flex-1 px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Système</button>
+            <button
+              onClick={() => { setNotifTab('all'); setShowAllNotifs(false); }}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${notifTab === 'all' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Toutes
+            </button>
+            <button
+              onClick={() => { setNotifTab('messages'); setShowAllNotifs(false); }}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${notifTab === 'messages' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Messages
+            </button>
+            <button
+              onClick={() => { setNotifTab('sla'); setShowAllNotifs(false); }}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${notifTab === 'sla' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              SLA
+            </button>
+            <button
+              onClick={() => { setNotifTab('system'); setShowAllNotifs(false); }}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${notifTab === 'system' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Système
+            </button>
           </div>
 
-          <div className="max-h-[400px] overflow-y-auto">
-            {notifications.length === 0 ? (
+          <div className={`${showAllNotifs ? 'max-h-[70vh]' : 'max-h-[400px]'} overflow-y-auto`}>
+            {filteredNotifications.length === 0 ? (
               <div className="p-8 text-center">
                 <Bell className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Aucune notification</p>
+                <p className="text-sm text-gray-500">
+                  {notifTab === 'all' ? 'Aucune notification' :
+                   notifTab === 'messages' ? 'Aucun message' :
+                   notifTab === 'sla' ? 'Aucune alerte SLA' :
+                   'Aucune notification système'}
+                </p>
               </div>
             ) : (
               <>
-                {notifications.slice(0, 10).map(n => {
+                {(showAllNotifs ? filteredNotifications : filteredNotifications.slice(0, 10)).map(n => {
+                  // Trouver le ticket associé pour afficher son numéro
+                  const relatedTicket = n.ticketId ? tickets.find(t => t.id === n.ticketId) : null;
+                  // Utiliser ticketNumber de la notification, du payload, ou du ticket trouvé
+                  const ticketNumber = n.ticketNumber || (n.payload?.ticketNumber as number) || relatedTicket?.ticketNumber;
+                  const ticketTitleDisplay = n.ticketTitle || (n.payload?.ticketTitle as string) || relatedTicket?.title;
+
                   const getNotifIcon = () => {
                     switch(n.type) {
                       case 'MESSAGE': return <MessageSquare className="w-4 h-4 text-blue-500" />;
@@ -814,21 +998,43 @@ const Header: React.FC = () => {
                       default: return 'bg-gray-50 border-gray-200';
                     }
                   };
-                  const handleNotifClick = () => {
+                  const handleNotifClick = async () => {
                     // Mark as read
                     if (!n.isRead) {
                       markNotificationsAsRead([n.id]);
                     }
                     // Navigate to ticket if ticketId exists
                     if (n.ticketId) {
-                      const ticket = tickets.find(t => t.id === n.ticketId);
-                      if (ticket) {
-                        setSelectedTicket(ticket);
+                      // Si le ticket est déjà chargé, l'utiliser
+                      if (relatedTicket) {
+                        setSelectedTicket(relatedTicket);
                         setCurrentView('tickets');
+                      } else {
+                        // Sinon, essayer de charger le ticket depuis l'API
+                        try {
+                          const ticket = await AdminApi.getTicketById(n.ticketId);
+                          if (ticket) {
+                            setSelectedTicket(ticket);
+                            setCurrentView('tickets');
+                          }
+                        } catch (err) {
+                          console.error('Erreur chargement ticket:', err);
+                        }
                       }
                     }
                     setShowNotifs(false);
                   };
+
+                  // Construire le texte d'affichage du ticket
+                  const getTicketDisplay = () => {
+                    if (ticketNumber) {
+                      return `Ticket #${ticketNumber}`;
+                    } else if (n.ticketId) {
+                      return `Ticket #${n.ticketId.slice(0, 8)}`;
+                    }
+                    return null;
+                  };
+
                   return (
                     <div key={n.id} onClick={handleNotifClick} className={`p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!n.isRead ? 'bg-blue-50/30' : ''}`}>
                       <div className="flex items-start gap-3">
@@ -842,7 +1048,12 @@ const Header: React.FC = () => {
                           </div>
                           {n.title && <p className="text-xs text-gray-700 truncate">{n.title}</p>}
                           {n.body && <p className="text-xs text-gray-500 truncate mt-0.5">{n.body}</p>}
-                          {n.ticketId && !n.title && <p className="text-xs text-gray-600 truncate">Ticket #{n.ticketId.slice(0, 8)}</p>}
+                          {n.ticketId && !n.title && (
+                            <p className="text-xs text-blue-600 truncate font-medium">
+                              {getTicketDisplay()}
+                              {ticketTitleDisplay && <span className="text-gray-500 font-normal ml-1">- {ticketTitleDisplay.slice(0, 30)}{ticketTitleDisplay.length > 30 ? '...' : ''}</span>}
+                            </p>
+                          )}
                           <p className="text-xs text-gray-400 mt-1">{formatDateTime(n.createdAt)}</p>
                         </div>
                         {!n.isRead && (
@@ -862,9 +1073,17 @@ const Header: React.FC = () => {
             )}
           </div>
 
-          {notifications.length > 0 && (
+          {filteredNotifications.length > 10 && (
             <div className="p-3 border-t border-gray-100 text-center">
-              <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">Voir toutes les notifications</button>
+              <button
+                onClick={() => setShowAllNotifs(!showAllNotifs)}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {showAllNotifs
+                  ? 'Afficher moins'
+                  : `Voir toutes les notifications (${filteredNotifications.length})`
+                }
+              </button>
             </div>
           )}
         </div>
@@ -1012,6 +1231,7 @@ const AIAssistant: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpe
     const found = tickets.filter(t =>
       t.title.toLowerCase().includes(searchTerm) ||
       t.ticketNumber?.toString().includes(searchTerm) ||
+      t.customer?.displayName?.toLowerCase().includes(searchTerm) ||
       t.contactName?.toLowerCase().includes(searchTerm) ||
       t.companyName?.toLowerCase().includes(searchTerm)
     );
@@ -1022,8 +1242,9 @@ const AIAssistant: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpe
 
     let response = `🔍 **${found.length} résultat${found.length > 1 ? 's' : ''} pour "${query}":**\n\n`;
     found.slice(0, 5).forEach(t => {
+      const clientName = t.customer?.displayName || t.contactName || t.companyName || 'Client';
       response += `• **#${t.ticketNumber}** - ${t.title.slice(0, 35)}${t.title.length > 35 ? '...' : ''}\n`;
-      response += `  ${t.contactName || t.customer?.displayName || 'Client'} • ${STATUS_LABELS[t.status as TicketStatus]}\n`;
+      response += `  ${clientName} • ${STATUS_LABELS[t.status as TicketStatus]}\n`;
     });
 
     return response;
@@ -1210,13 +1431,29 @@ const ChatPanel: React.FC<{
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [showQuickResponses, setShowQuickResponses] = useState(false);
+  const [quickResponseCategory, setQuickResponseCategory] = useState<string | null>(null);
+  const [quickResponseSearch, setQuickResponseSearch] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [isAITyping, setIsAITyping] = useState(false);
   const [aiResponseCount, setAiResponseCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const quickResponsesRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+
+  // Filtrer les réponses rapides
+  const filteredQuickResponses = useMemo(() => {
+    return QUICK_RESPONSES.filter(qr => {
+      const matchesCategory = !quickResponseCategory || qr.category === quickResponseCategory;
+      const matchesSearch = !quickResponseSearch ||
+        qr.title.toLowerCase().includes(quickResponseSearch.toLowerCase()) ||
+        qr.content.toLowerCase().includes(quickResponseSearch.toLowerCase()) ||
+        qr.shortcut?.toLowerCase().includes(quickResponseSearch.toLowerCase()) ||
+        qr.tags?.some(t => t.toLowerCase().includes(quickResponseSearch.toLowerCase()));
+      return matchesCategory && matchesSearch;
+    });
+  }, [quickResponseCategory, quickResponseSearch]);
 
   // Gérer le message initial de l'assistant IA
   useEffect(() => {
@@ -1279,7 +1516,7 @@ const ChatPanel: React.FC<{
         ticketDescription: ticket.description,
         issueType: ticket.issueType,
         priority: ticket.priority,
-        customerName: ticket.contactName || ticket.companyName,
+        customerName: ticket.customer?.displayName || ticket.contactName || ticket.companyName,
         lastCustomerMessage: '',
         messageCount: messages.length + aiMessages.length,
       };
@@ -1328,41 +1565,32 @@ const ChatPanel: React.FC<{
     }
   };
 
-  // Simuler une réponse client pour démo
-  const simulateCustomerMessage = () => {
-    const customerResponses = [
-      "D'accord, je vais essayer ça. Merci pour votre aide.",
-      "Le problème persiste malgré le redémarrage.",
-      "Pouvez-vous m'envoyer un technicien ?",
-      "J'ai besoin d'une solution rapide, c'est urgent.",
-      "Où puis-je trouver le numéro de série ?",
-    ];
-    const randomResponse = customerResponses[Math.floor(Math.random() * customerResponses.length)];
-
-    // Créer un message client simulé
-    const fakeCustomerMessage: TicketMessage = {
-      id: `customer-${Date.now()}`,
-      ticketId,
-      authorId: 'customer-fake',
-      content: randomResponse,
-      isInternal: false,
-      createdAt: new Date(),
-      author: { id: 'customer-fake', displayName: ticket?.contactName || 'Client', role: 'CUSTOMER' as UserRole, email: '', createdAt: '', updatedAt: '' },
-    };
-
-    setMessages(prev => [...prev, fakeCustomerMessage]);
-
-    // Déclencher une réponse IA après le message client
-    if (aiEnabled) {
-      setTimeout(() => {
-        triggerAIResponse();
-      }, 500);
-    }
-  };
-
   const handleQuickResponse = (content: string) => {
-    setNewMessage(content);
+    // Substituer les variables dynamiques
+    let processedContent = content;
+    if (ticket) {
+      // Priorité : customer.displayName (compte client) > contactName > companyName > 'Client'
+      // Le client est TOUJOURS disponible car c'est lui qui crée le ticket
+      const customerName = ticket.customer?.displayName || ticket.contactName || ticket.companyName || 'Client';
+      const customerEmail = ticket.customer?.email || ticket.contactEmail || '';
+      const customerPhone = ticket.customer?.phone || ticket.contactPhone || '';
+
+      processedContent = processedContent
+        .replace(/\{\{customerName\}\}/g, customerName)
+        .replace(/\{\{customerEmail\}\}/g, customerEmail)
+        .replace(/\{\{customerPhone\}\}/g, customerPhone)
+        .replace(/\{\{companyName\}\}/g, ticket.companyName || '')
+        .replace(/\{\{ticketTitle\}\}/g, ticket.title || '')
+        .replace(/\{\{ticketNumber\}\}/g, String(ticket.ticketNumber) || '')
+        .replace(/\{\{equipmentModel\}\}/g, ticket.equipmentModel || 'votre équipement')
+        .replace(/\{\{equipmentBrand\}\}/g, ticket.equipmentBrand || '')
+        .replace(/\{\{serialNumber\}\}/g, ticket.serialNumber || '')
+        .replace(/\{\{errorCode\}\}/g, ticket.errorCode || '');
+    }
+    setNewMessage(processedContent);
     setShowQuickResponses(false);
+    setQuickResponseSearch('');
+    setQuickResponseCategory(null);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1419,6 +1647,30 @@ const ChatPanel: React.FC<{
         </div>
       </div>
 
+      {/* Légende des couleurs */}
+      <div className="px-4 py-2 bg-gray-100 border-b border-gray-200 flex items-center justify-center gap-4 text-[10px]">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-purple-500 to-violet-600" />
+          <span className="text-gray-600">IA</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
+          <span className="text-gray-600">Client</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-600" />
+          <span className="text-gray-600">Vous</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500" />
+          <span className="text-gray-600">Opérateur</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded border-2 border-dashed border-slate-400" />
+          <span className="text-gray-600">Note interne</span>
+        </div>
+      </div>
+
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {allMessages.length === 0 && !isAITyping ? (
@@ -1433,77 +1685,121 @@ const ChatPanel: React.FC<{
               const isAIMessage = m.isAI;
               const isOwnMessage = !isAIMessage && m.authorId === user?.id;
               const isInternalNote = !isAIMessage && (m as TicketMessage).isInternal;
+              const authorRole = !isAIMessage ? (m as TicketMessage).author?.role : null;
+              const isCustomerMessage = !isAIMessage && authorRole === 'CUSTOMER';
+              const isOperatorMessage = !isAIMessage && !isOwnMessage && !isCustomerMessage && !isAIMessage;
+
+              // Définir les styles selon le type de message
+              const getMessageStyles = () => {
+                if (isAIMessage) return {
+                  bubble: 'bg-gradient-to-r from-purple-100 to-violet-100 border-2 border-purple-300',
+                  avatar: 'bg-gradient-to-br from-purple-500 to-violet-600',
+                  avatarIcon: <Brain className="w-4 h-4 text-white" />,
+                  headerColor: 'text-purple-700',
+                  timeColor: 'text-purple-500',
+                  textColor: 'text-purple-900',
+                  label: 'Assistant IA KLY',
+                  labelIcon: <Sparkles className="w-3.5 h-3.5" />,
+                };
+                if (isInternalNote) return {
+                  bubble: 'bg-gradient-to-r from-slate-100 to-gray-100 border-2 border-slate-400 border-dashed',
+                  avatar: 'bg-slate-200',
+                  avatarIcon: <Lock className="w-4 h-4 text-slate-600" />,
+                  headerColor: 'text-slate-700',
+                  timeColor: 'text-slate-500',
+                  textColor: 'text-slate-800',
+                  label: 'NOTE INTERNE',
+                  labelIcon: <Lock className="w-3.5 h-3.5" />,
+                };
+                if (isCustomerMessage) return {
+                  bubble: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300',
+                  avatar: 'bg-gradient-to-br from-amber-400 to-orange-500',
+                  avatarIcon: <User className="w-4 h-4 text-white" />,
+                  headerColor: 'text-amber-700',
+                  timeColor: 'text-amber-600',
+                  textColor: 'text-amber-900',
+                  label: 'Client',
+                  labelIcon: <User className="w-3.5 h-3.5" />,
+                };
+                if (isOwnMessage) return {
+                  bubble: 'bg-gradient-to-r from-blue-500 to-blue-600 text-white',
+                  avatar: 'bg-blue-200',
+                  avatarIcon: null,
+                  headerColor: 'text-white/90',
+                  timeColor: 'text-white/70',
+                  textColor: 'text-white',
+                  label: 'Vous',
+                  labelIcon: null,
+                };
+                // Autre opérateur
+                return {
+                  bubble: 'bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300',
+                  avatar: 'bg-gradient-to-br from-emerald-400 to-teal-500',
+                  avatarIcon: <Headphones className="w-4 h-4 text-white" />,
+                  headerColor: 'text-emerald-700',
+                  timeColor: 'text-emerald-600',
+                  textColor: 'text-emerald-900',
+                  label: 'Opérateur',
+                  labelIcon: <Headphones className="w-3.5 h-3.5" />,
+                };
+              };
+
+              const styles = getMessageStyles();
 
               return (
                 <div key={m.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                   {/* Avatar */}
                   {!isOwnMessage && (
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 flex-shrink-0 ${
-                      isAIMessage ? 'bg-gradient-to-br from-purple-500 to-indigo-500' : 'bg-gray-200'
-                    }`}>
-                      {isAIMessage ? (
-                        <Brain className="w-4 h-4 text-white" />
-                      ) : (
-                        <span className="text-xs font-medium text-gray-600">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center mr-2 flex-shrink-0 shadow-sm ${styles.avatar}`}>
+                      {styles.avatarIcon || (
+                        <span className="text-xs font-bold text-gray-700">
                           {getInitials((m as TicketMessage).author?.displayName, (m as TicketMessage).author?.email)}
                         </span>
                       )}
                     </div>
                   )}
 
-                  <div className={`max-w-[75%] ${
-                    isAIMessage
-                      ? 'bg-gradient-to-r from-purple-100 to-indigo-100 border border-purple-200'
-                      : isInternalNote
-                        ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-2 border-indigo-300 border-dashed'
-                        : isOwnMessage
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white border border-gray-200 shadow-sm'
-                  } rounded-2xl ${isOwnMessage && !isInternalNote ? 'rounded-br-md' : 'rounded-bl-md'} p-4`}>
+                  <div className={`max-w-[75%] ${styles.bubble} rounded-2xl ${isOwnMessage ? 'rounded-br-sm' : 'rounded-bl-sm'} p-4 shadow-sm`}>
 
-                    {/* Badge IA */}
-                    {isAIMessage && (
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-purple-700 mb-2 pb-2 border-b border-purple-200">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Assistant IA KLY</span>
-                        {(m as AILocalMessage).confidence && (
-                          <span className="ml-auto text-purple-500">
+                    {/* Badge type de message */}
+                    {(isAIMessage || isInternalNote || isCustomerMessage || isOperatorMessage) && (
+                      <div className={`flex items-center gap-1.5 text-xs font-semibold ${styles.headerColor} mb-2 pb-2 border-b ${
+                        isAIMessage ? 'border-purple-200' :
+                        isInternalNote ? 'border-slate-300' :
+                        isCustomerMessage ? 'border-amber-200' :
+                        'border-emerald-200'
+                      }`}>
+                        {styles.labelIcon}
+                        <span>{isAIMessage ? 'Assistant IA KLY' : isCustomerMessage ? 'Client' : isInternalNote ? 'NOTE INTERNE' : (m as TicketMessage).author?.displayName || 'Opérateur'}</span>
+                        {isAIMessage && (m as AILocalMessage).confidence && (
+                          <span className="ml-auto text-purple-500 font-normal">
                             {(m as AILocalMessage).confidence}% confiance
                           </span>
                         )}
                       </div>
                     )}
 
-                    {/* Badge note interne */}
-                    {isInternalNote && (
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-indigo-700 mb-2 pb-2 border-b border-indigo-200">
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>NOTE INTERNE</span>
+                    {/* Header pour ses propres messages */}
+                    {isOwnMessage && (
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-xs font-semibold ${styles.headerColor}`}>Vous</span>
+                        <span className={`text-[10px] ${styles.timeColor}`}>
+                          {formatTime(m.isAI ? m.timestamp : m.createdAt)}
+                        </span>
                       </div>
                     )}
 
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-medium ${
-                        isAIMessage ? 'text-purple-600' :
-                        isInternalNote ? 'text-indigo-600' :
-                        isOwnMessage ? 'text-white/80' : 'text-gray-500'
-                      }`}>
-                        {isAIMessage ? 'Assistant IA' : isOwnMessage ? 'Vous' : (m as TicketMessage).author?.displayName || 'Client'}
-                      </span>
-                      <span className={`text-[10px] ${
-                        isAIMessage ? 'text-purple-500' :
-                        isInternalNote ? 'text-indigo-500' :
-                        isOwnMessage ? 'text-white/60' : 'text-gray-400'
-                      }`}>
-                        {formatTime(m.isAI ? m.timestamp : m.createdAt)}
-                      </span>
-                    </div>
+                    {/* Timestamp pour les autres messages */}
+                    {!isOwnMessage && (
+                      <div className="flex justify-end mb-1">
+                        <span className={`text-[10px] ${styles.timeColor}`}>
+                          {formatTime(m.isAI ? m.timestamp : m.createdAt)}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Content */}
-                    <p className={`text-sm whitespace-pre-wrap leading-relaxed ${
-                      isAIMessage ? 'text-purple-900' : isInternalNote ? 'text-indigo-900' : ''
-                    }`}>
+                    <p className={`text-sm whitespace-pre-wrap leading-relaxed ${styles.textColor}`}>
                       {m.content}
                     </p>
 
@@ -1524,8 +1820,8 @@ const ChatPanel: React.FC<{
 
                   {/* Avatar pour ses propres messages */}
                   {isOwnMessage && !isInternalNote && (
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center ml-2 flex-shrink-0">
-                      <span className="text-xs font-medium text-blue-600">{getInitials(user?.displayName, user?.email)}</span>
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center ml-2 flex-shrink-0 shadow-sm">
+                      <span className="text-xs font-bold text-white">{getInitials(user?.displayName, user?.email)}</span>
                     </div>
                   )}
                 </div>
@@ -1555,17 +1851,129 @@ const ChatPanel: React.FC<{
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick responses dropdown */}
+      {/* Quick responses dropdown amélioré */}
       {showQuickResponses && (
-        <div className="absolute bottom-24 left-4 right-4 bg-white rounded-xl shadow-xl border border-gray-200 p-2 z-10 max-h-60 overflow-y-auto">
-          <p className="text-xs font-medium text-gray-500 px-2 py-1">Réponses rapides</p>
-          {QUICK_RESPONSES.map(qr => (
-            <button key={qr.id} onClick={() => handleQuickResponse(qr.content)}
-              className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors">
-              <p className="text-sm font-medium text-gray-900">{qr.title}</p>
-              <p className="text-xs text-gray-500 truncate">{qr.content.substring(0, 60)}...</p>
+        <div
+          ref={quickResponsesRef}
+          className="absolute bottom-24 left-4 right-4 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden"
+          style={{ maxHeight: '400px' }}
+        >
+          {/* Header avec recherche */}
+          <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-blue-600" />
+                Réponses rapides
+              </h4>
+              <button
+                onClick={() => {
+                  setShowQuickResponses(false);
+                  setQuickResponseSearch('');
+                  setQuickResponseCategory(null);
+                }}
+                className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Rechercher ou tapez un raccourci (ar, pc, di...)"
+                value={quickResponseSearch}
+                onChange={e => setQuickResponseSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Catégories */}
+          <div className="flex gap-1 p-2 border-b border-gray-100 overflow-x-auto">
+            <button
+              onClick={() => setQuickResponseCategory(null)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+                !quickResponseCategory
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Tout
             </button>
-          ))}
+            {Object.entries(QUICK_RESPONSE_CATEGORIES).map(([key, cat]) => (
+              <button
+                key={key}
+                onClick={() => setQuickResponseCategory(key)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+                  quickResponseCategory === key
+                    ? 'bg-blue-600 text-white'
+                    : `${cat.color} hover:opacity-80`
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Liste des réponses */}
+          <div className="overflow-y-auto" style={{ maxHeight: '250px' }}>
+            {filteredQuickResponses.length === 0 ? (
+              <div className="p-6 text-center text-gray-400">
+                <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Aucune réponse trouvée</p>
+              </div>
+            ) : (
+              <div className="p-2 space-y-1">
+                {filteredQuickResponses.map(qr => {
+                  const catConfig = QUICK_RESPONSE_CATEGORIES[qr.category];
+                  return (
+                    <button
+                      key={qr.id}
+                      onClick={() => handleQuickResponse(qr.content)}
+                      className="w-full text-left p-3 hover:bg-gray-50 rounded-lg transition-colors group border border-transparent hover:border-gray-200"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">{qr.title}</p>
+                            {qr.shortcut && (
+                              <span className="text-[10px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                /{qr.shortcut}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                            {qr.content.substring(0, 100).replace(/\{\{[^}]+\}\}/g, '...')}...
+                          </p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${catConfig.color}`}>
+                          {catConfig.label}
+                        </span>
+                      </div>
+                      {/* Aperçu au survol */}
+                      <div className="hidden group-hover:block mt-2 p-2 bg-gray-50 rounded-lg border border-gray-100 text-xs text-gray-600 whitespace-pre-wrap max-h-24 overflow-y-auto">
+                        {qr.content
+                          .replace(/\{\{customerName\}\}/g, ticket?.customer?.displayName || ticket?.contactName || ticket?.companyName || '[Client]')
+                          .replace(/\{\{ticketTitle\}\}/g, ticket?.title || '[Titre]')
+                          .replace(/\{\{ticketNumber\}\}/g, String(ticket?.ticketNumber) || '[N°]')
+                          .replace(/\{\{equipmentModel\}\}/g, ticket?.equipmentModel || '[Équipement]')
+                          .substring(0, 200)}
+                        {qr.content.length > 200 && '...'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Footer avec info */}
+          <div className="p-2 bg-gray-50 border-t border-gray-100 text-center">
+            <p className="text-[10px] text-gray-400">
+              Tapez <span className="font-mono bg-gray-200 px-1 rounded">/raccourci</span> pour filtrer • Les variables comme {`{{customerName}}`} seront remplacées automatiquement
+            </p>
+          </div>
         </div>
       )}
 
@@ -1601,18 +2009,8 @@ const ChatPanel: React.FC<{
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Bouton simulation client (pour démo) */}
-            <button
-              onClick={simulateCustomerMessage}
-              className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-700 px-2 py-1 hover:bg-orange-50 rounded-lg transition-colors border border-orange-200"
-              title="Simuler une réponse client (démo)"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Simuler client
-            </button>
-
             <button onClick={() => setShowQuickResponses(!showQuickResponses)}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors">
+              className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 px-3 py-1.5 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200">
               <Zap className="w-3.5 h-3.5" />Réponses rapides
             </button>
           </div>
@@ -1921,8 +2319,8 @@ const AIAssistantPanel: React.FC<{ ticketId: string; ticket?: Ticket; onUseDraft
     );
   }
 
-  // Analyser les données du résumé IA
-  const customerName = ticket.contactName || ticket.customer?.displayName || 'Client';
+  // Analyser les données du résumé IA - Priorité: compte client > contact > entreprise
+  const customerName = ticket.customer?.displayName || ticket.contactName || ticket.companyName || 'Client';
   const customerFirstName = customerName.split(' ')[0];
 
   // Utiliser les données IA pour le sentiment
@@ -2244,6 +2642,69 @@ const AIAssistantPanel: React.FC<{ ticketId: string; ticket?: Ticket; onUseDraft
   );
 };
 
+// Composant SLA Timer
+const SLATimer: React.FC<{ deadline: string | Date | null; breached: boolean; compact?: boolean }> = ({ deadline, breached, compact = false }) => {
+  const [timeLeft, setTimeLeft] = useState('');
+  const [urgencyLevel, setUrgencyLevel] = useState<'safe' | 'warning' | 'critical' | 'breached'>('safe');
+
+  useEffect(() => {
+    if (!deadline) return;
+
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const deadlineDate = new Date(deadline);
+      const diff = deadlineDate.getTime() - now.getTime();
+
+      if (breached || diff < 0) {
+        setUrgencyLevel('breached');
+        const absDiff = Math.abs(diff);
+        const hours = Math.floor(absDiff / (1000 * 60 * 60));
+        const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+        setTimeLeft(`-${hours}h${compact ? '' : ` ${minutes}m`}`);
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (hours < 1) setUrgencyLevel('critical');
+        else if (hours < 4) setUrgencyLevel('warning');
+        else setUrgencyLevel('safe');
+
+        setTimeLeft(`${hours}h${compact ? '' : ` ${minutes}m`}`);
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 60000);
+    return () => clearInterval(interval);
+  }, [deadline, breached, compact]);
+
+  if (!deadline) return null;
+
+  const colors = {
+    safe: 'bg-green-100 text-green-700 border-green-300',
+    warning: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+    critical: 'bg-orange-100 text-orange-700 border-orange-300 animate-pulse',
+    breached: 'bg-red-100 text-red-700 border-red-300',
+  };
+
+  if (compact) {
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${colors[urgencyLevel]}`}>
+        <Timer className="w-3 h-3" />
+        {timeLeft}
+      </span>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${colors[urgencyLevel]}`}>
+      <Timer className="w-4 h-4" />
+      <span className="text-sm font-bold">{timeLeft}</span>
+      <span className="text-xs opacity-75">{urgencyLevel === 'breached' ? 'Dépassé' : 'restant'}</span>
+    </div>
+  );
+};
+
 const TicketDetailModal: React.FC<{
   ticket: Ticket;
   onClose: () => void;
@@ -2254,7 +2715,19 @@ const TicketDetailModal: React.FC<{
   const [isSaving, setIsSaving] = useState(false);
   const [documentsCount, setDocumentsCount] = useState(ticket.attachments?.length || 0);
   const [draftFromAI, setDraftFromAI] = useState('');
-  const { users } = useAdmin();
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferReason, setTransferReason] = useState('');
+  const [selectedAgent, setSelectedAgent] = useState('');
+  const { users, refreshData } = useAdmin();
+  const { user } = useAuth();
+
+  // Agents disponibles pour transfert
+  const availableAgents = users.filter(
+    u => u.role !== UserRole.CUSTOMER && u.id !== editedTicket.assignedToId && u.isActive !== false
+  );
+
+  // Vérifier si le ticket m'appartient
+  const isMyTicket = editedTicket.assignedToId === user?.id;
 
   // Charger le compte total des documents (ticket + messages)
   useEffect(() => {
@@ -2263,7 +2736,6 @@ const TicketDetailModal: React.FC<{
         const messages = await AdminApi.getTicketMessages(ticket.id);
         const messageAttachments = messages.flatMap(m => m.attachments || []);
         const ticketAttachments = ticket.attachments || [];
-        // Dédupliquer par ID
         const allIds = new Set([
           ...ticketAttachments.map(a => a.id),
           ...messageAttachments.map(a => a.id)
@@ -2275,6 +2747,41 @@ const TicketDetailModal: React.FC<{
     };
     loadDocumentsCount();
   }, [ticket.id, ticket.attachments]);
+
+  // Raccourcis clavier
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      // Ctrl+1-5 pour les onglets
+      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+        e.preventDefault();
+        const tabs = ['details', 'messages', 'ai-assistant', 'documents', 'history'];
+        setActiveTab(tabs[parseInt(e.key) - 1]);
+      }
+      // R pour résoudre
+      if (e.key === 'r' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (editedTicket.status !== TicketStatus.RESOLVED && editedTicket.status !== TicketStatus.CLOSED) {
+          handleUpdate({ status: TicketStatus.RESOLVED });
+        }
+      }
+      // E pour escalader
+      if (e.key === 'e' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (editedTicket.status !== TicketStatus.ESCALATED) {
+          handleUpdate({ status: TicketStatus.ESCALATED });
+        }
+      }
+      // Escape pour fermer
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editedTicket.status]);
 
   const handleUpdate = async (updates: Partial<Ticket>) => {
     setIsSaving(true);
@@ -2294,25 +2801,213 @@ const TicketDetailModal: React.FC<{
     }
   };
 
+  const handleTransfer = async () => {
+    if (!selectedAgent) return;
+    try {
+      await AdminApi.requestTransfer(ticket.id, selectedAgent, transferReason);
+      setShowTransferModal(false);
+      setTransferReason('');
+      setSelectedAgent('');
+      alert('Demande de transfert envoyée avec succès !');
+    } catch (error) {
+      console.error('Erreur transfert:', error);
+      alert('Erreur lors du transfert');
+    }
+  };
+
+  const handleTakeOver = async () => {
+    if (!user) return;
+    await handleUpdate({ assignedToId: user.id });
+  };
+
   const assignee = users.find(u => u.id === editedTicket.assignedToId);
+  const ticketAge = Math.floor((Date.now() - new Date(ticket.createdAt).getTime()) / (1000 * 60 * 60 * 24));
 
   return (
     <Modal isOpen={true} onClose={onClose} title="" size="full">
-      {/* Header custom */}
-      <div className="-mt-5 -mx-5 px-5 pb-4 border-b border-gray-100">
+      {/* Header amélioré */}
+      <div className="-mt-5 -mx-5 px-5 pb-4 bg-gradient-to-r from-slate-50 to-gray-50 border-b border-gray-200">
         <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-mono font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">#{ticket.ticketNumber}</span>
-              <Badge className={getStatusColor(editedTicket.status)}>{STATUS_LABELS[editedTicket.status]}</Badge>
-              <Badge className={getPriorityColor(editedTicket.priority)}>{PRIORITY_LABELS[editedTicket.priority]}</Badge>
-              {editedTicket.slaBreached && <Badge className="bg-red-100 text-red-700 border border-red-200"><AlertTriangle className="w-3 h-3" />SLA dépassé</Badge>}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="text-lg font-mono font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg">#{ticket.ticketNumber}</span>
+              <Badge className={`${getStatusColor(editedTicket.status)} text-sm px-3 py-1`}>{STATUS_LABELS[editedTicket.status]}</Badge>
+              <Badge className={`${getPriorityColor(editedTicket.priority)} text-sm px-3 py-1`}>{PRIORITY_LABELS[editedTicket.priority]}</Badge>
+              <Badge className="bg-gray-100 text-gray-600 text-sm px-3 py-1">{ISSUE_TYPE_LABELS[editedTicket.issueType]}</Badge>
+              {ticketAge > 0 && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">{ticketAge}j</span>}
               {isSaving && <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />}
             </div>
-            <h2 className="text-xl font-bold text-gray-900">{ticket.title}</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">{ticket.title}</h2>
+            <div className="flex items-center gap-4 text-sm text-gray-500">
+              {/* Client : compte ou contact */}
+              {(ticket.customer || ticket.contactName || ticket.companyName) && (
+                <span className="flex items-center gap-1">
+                  <User className="w-4 h-4" />
+                  {ticket.customer?.displayName || ticket.contactName || ticket.companyName}
+                </span>
+              )}
+              {ticket.companyName && ticket.customer && (
+                <span className="flex items-center gap-1">
+                  <Building2 className="w-4 h-4" />
+                  {ticket.companyName}
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                {formatDateTime(ticket.createdAt)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-2">
+            {/* SLA Timer */}
+            <SLATimer deadline={ticket.slaDeadline || null} breached={editedTicket.slaBreached || false} />
+
+            {/* Agent assigné */}
+            {assignee ? (
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+                <div className="w-7 h-7 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-white">{getInitials(assignee.displayName, assignee.email)}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{assignee.displayName}</p>
+                  <p className="text-[10px] text-gray-500">{ROLE_CONFIG[assignee.role]?.label}</p>
+                </div>
+              </div>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={handleTakeOver} className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200">
+                <User className="w-4 h-4 mr-1" />
+                Prendre en charge
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Barre d'actions rapides améliorée */}
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          {/* Changements de statut rapides */}
+          {editedTicket.status === TicketStatus.OPEN && (
+            <Button variant="primary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.IN_PROGRESS })} className="bg-blue-600 hover:bg-blue-700">
+              <PlayCircle className="w-4 h-4 mr-1" />Démarrer
+            </Button>
+          )}
+          {editedTicket.status === TicketStatus.IN_PROGRESS && (
+            <>
+              <Button variant="primary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.RESOLVED })} className="bg-green-600 hover:bg-green-700">
+                <CheckCircle className="w-4 h-4 mr-1" />Résoudre <span className="ml-1 text-xs opacity-70">(R)</span>
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.WAITING_CUSTOMER })} className="text-yellow-700 border-yellow-300 hover:bg-yellow-50">
+                <Clock className="w-4 h-4 mr-1" />Attente client
+              </Button>
+            </>
+          )}
+          {editedTicket.status === TicketStatus.WAITING_CUSTOMER && (
+            <Button variant="primary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.IN_PROGRESS })} className="bg-blue-600 hover:bg-blue-700">
+              <PlayCircle className="w-4 h-4 mr-1" />Reprendre
+            </Button>
+          )}
+          {editedTicket.status === TicketStatus.RESOLVED && (
+            <Button variant="secondary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.CLOSED })} className="text-gray-700">
+              <XCircle className="w-4 h-4 mr-1" />Clôturer
+            </Button>
+          )}
+          {(editedTicket.status === TicketStatus.RESOLVED || editedTicket.status === TicketStatus.CLOSED) && (
+            <Button variant="secondary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.REOPENED })} className="text-orange-700 border-orange-300 hover:bg-orange-50">
+              <RefreshCw className="w-4 h-4 mr-1" />Réouvrir
+            </Button>
+          )}
+
+          <div className="h-6 w-px bg-gray-300 mx-1" />
+
+          {/* Actions secondaires */}
+          {editedTicket.status !== TicketStatus.ESCALATED && editedTicket.status !== TicketStatus.CLOSED && (
+            <Button variant="ghost" size="sm" onClick={() => handleUpdate({ status: TicketStatus.ESCALATED })} className="text-red-600 hover:bg-red-50">
+              <AlertTriangle className="w-4 h-4 mr-1" />Escalader <span className="ml-1 text-xs opacity-70">(E)</span>
+            </Button>
+          )}
+
+          {isMyTicket && availableAgents.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setShowTransferModal(true)} className="text-blue-600 hover:bg-blue-50">
+              <ArrowUpRight className="w-4 h-4 mr-1" />Transférer
+            </Button>
+          )}
+
+          <div className="flex-1" />
+
+          {/* Priorité rapide */}
+          <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1">
+            {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as TicketPriority[]).map(p => (
+              <button
+                key={p}
+                onClick={() => handleUpdate({ priority: p })}
+                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                  editedTicket.priority === p
+                    ? getPriorityColor(p)
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                }`}
+                title={PRIORITY_LABELS[p]}
+              >
+                {p === 'URGENT' ? '🔴' : p === 'HIGH' ? '🟠' : p === 'MEDIUM' ? '🔵' : '⚪'}
+              </button>
+            ))}
+          </div>
+
+          {/* Raccourcis clavier hint */}
+          <span className="text-[10px] text-gray-400 hidden lg:block">
+            Ctrl+1-5: onglets • R: résoudre • E: escalader • Esc: fermer
+          </span>
+        </div>
       </div>
+
+      {/* Modal de transfert */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowTransferModal(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <ArrowUpRight className="w-5 h-5 text-blue-600" />
+              Transférer le ticket
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Transférer à</label>
+                <select
+                  value={selectedAgent}
+                  onChange={e => setSelectedAgent(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Sélectionner un agent...</option>
+                  {availableAgents.map(agent => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.displayName} ({ROLE_CONFIG[agent.role]?.label})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Raison (optionnel)</label>
+                <textarea
+                  value={transferReason}
+                  onChange={e => setTransferReason(e.target.value)}
+                  placeholder="Pourquoi transférez-vous ce ticket ?"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-20 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button variant="primary" className="flex-1" onClick={handleTransfer} disabled={!selectedAgent}>
+                Envoyer la demande
+              </Button>
+              <Button variant="secondary" onClick={() => setShowTransferModal(false)}>
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <QuickActions ticket={editedTicket} onUpdate={handleUpdate} />
 
@@ -2332,13 +3027,103 @@ const TicketDetailModal: React.FC<{
         {activeTab === 'details' && (
           <div className="grid grid-cols-3 gap-6">
             <div className="col-span-2 space-y-5">
+              {/* Timeline mini du statut */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Activity className="w-4 h-4" />
+                  Progression du ticket
+                </h4>
+                <div className="flex items-center gap-2">
+                  {[
+                    { status: 'OPEN', label: 'Ouvert', icon: <AlertCircle className="w-4 h-4" /> },
+                    { status: 'IN_PROGRESS', label: 'En cours', icon: <PlayCircle className="w-4 h-4" /> },
+                    { status: 'WAITING_CUSTOMER', label: 'Attente', icon: <Clock className="w-4 h-4" /> },
+                    { status: 'RESOLVED', label: 'Résolu', icon: <CheckCircle className="w-4 h-4" /> },
+                    { status: 'CLOSED', label: 'Fermé', icon: <XCircle className="w-4 h-4" /> },
+                  ].map((step, i, arr) => {
+                    const statusOrder = ['OPEN', 'IN_PROGRESS', 'WAITING_CUSTOMER', 'RESOLVED', 'CLOSED'];
+                    const currentIndex = statusOrder.indexOf(editedTicket.status);
+                    const stepIndex = statusOrder.indexOf(step.status);
+                    const isPast = stepIndex < currentIndex || (editedTicket.status === 'REOPENED' && step.status === 'OPEN');
+                    const isCurrent = step.status === editedTicket.status || (editedTicket.status === 'REOPENED' && step.status === 'OPEN');
+                    const isEscalated = editedTicket.status === 'ESCALATED';
+
+                    return (
+                      <React.Fragment key={step.status}>
+                        <div
+                          className={`flex flex-col items-center gap-1 ${
+                            isCurrent ? 'text-blue-600' : isPast ? 'text-green-600' : 'text-gray-300'
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            isCurrent ? 'bg-blue-600 text-white ring-4 ring-blue-200' :
+                            isPast ? 'bg-green-500 text-white' :
+                            'bg-gray-200 text-gray-400'
+                          }`}>
+                            {isPast && !isCurrent ? <CheckCircle className="w-4 h-4" /> : step.icon}
+                          </div>
+                          <span className="text-[10px] font-medium">{step.label}</span>
+                        </div>
+                        {i < arr.length - 1 && (
+                          <div className={`flex-1 h-1 rounded ${isPast ? 'bg-green-400' : 'bg-gray-200'}`} />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+                {editedTicket.status === 'ESCALATED' && (
+                  <div className="mt-3 flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm font-medium">Ticket escaladé - Attention requise</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Description */}
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</label>
-                <div className="mt-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Description du problème</label>
+                <div className="mt-2 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
                   <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{ticket.description || 'Aucune description fournie.'}</p>
                 </div>
               </div>
 
+              {/* Informations équipement si disponibles */}
+              {(ticket.serialNumber || ticket.equipmentModel || ticket.equipmentBrand || ticket.errorCode) && (
+                <Card className="p-4 bg-gradient-to-r from-slate-50 to-gray-50">
+                  <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Wrench className="w-4 h-4" />
+                    Informations équipement
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {ticket.equipmentBrand && (
+                      <div>
+                        <span className="text-xs text-gray-500">Marque</span>
+                        <p className="font-medium text-gray-900">{ticket.equipmentBrand}</p>
+                      </div>
+                    )}
+                    {ticket.equipmentModel && (
+                      <div>
+                        <span className="text-xs text-gray-500">Modèle</span>
+                        <p className="font-medium text-gray-900">{ticket.equipmentModel}</p>
+                      </div>
+                    )}
+                    {ticket.serialNumber && (
+                      <div>
+                        <span className="text-xs text-gray-500">N° de série</span>
+                        <p className="font-mono font-medium text-gray-900">{ticket.serialNumber}</p>
+                      </div>
+                    )}
+                    {ticket.errorCode && (
+                      <div>
+                        <span className="text-xs text-gray-500">Code erreur</span>
+                        <p className="font-mono font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded inline-block">{ticket.errorCode}</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Gestion du ticket */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</label>
@@ -2376,40 +3161,71 @@ const TicketDetailModal: React.FC<{
             </div>
 
             <div className="space-y-4">
-              <Card className="p-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Contact</h4>
+              {/* Contact client amélioré */}
+              <Card className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+                <h4 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Client
+                </h4>
                 <div className="space-y-3">
+                  {/* Afficher le compte client si disponible */}
+                  {ticket.customer && (
+                    <div className="flex items-center gap-2 p-2 bg-amber-100/50 rounded-lg">
+                      <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">{getInitials(ticket.customer.displayName, ticket.customer.email)}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{ticket.customer.displayName}</p>
+                        <p className="text-[10px] text-amber-600">Compte client</p>
+                      </div>
+                    </div>
+                  )}
                   {ticket.companyName && (
                     <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-medium">{ticket.companyName}</span>
+                      <Building2 className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-gray-900">{ticket.companyName}</span>
                     </div>
                   )}
-                  {ticket.contactName && (
+                  {ticket.contactName && !ticket.customer && (
                     <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm">{ticket.contactName}</span>
+                      <User className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm text-gray-700">{ticket.contactName}</span>
                     </div>
                   )}
-                  {ticket.contactPhone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <a href={`tel:${ticket.contactPhone}`} className="text-sm text-blue-600 hover:underline">{ticket.contactPhone}</a>
+                  {/* Téléphone : priorité au compte client, puis contact manuel */}
+                  {(ticket.customer?.phone || ticket.contactPhone) && (
+                    <a href={`tel:${ticket.customer?.phone || ticket.contactPhone}`} className="flex items-center gap-2 p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors group">
+                      <Phone className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-blue-600 group-hover:underline">{ticket.customer?.phone || ticket.contactPhone}</span>
+                      <span className="ml-auto text-xs text-gray-400">Appeler</span>
+                    </a>
+                  )}
+                  {/* Email : priorité au compte client, puis contact manuel - un email par ligne */}
+                  {(ticket.customer?.email || ticket.contactEmail) && (
+                    <div className="space-y-1">
+                      {(ticket.customer?.email || ticket.contactEmail || '').split(/[;,]/).map((email, idx) => {
+                        const trimmedEmail = email.trim();
+                        if (!trimmedEmail) return null;
+                        return (
+                          <a key={idx} href={`mailto:${trimmedEmail}`} className="flex items-center gap-2 p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors group">
+                            <Mail className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm text-blue-600 group-hover:underline">{trimmedEmail}</span>
+                          </a>
+                        );
+                      })}
                     </div>
                   )}
-                  {ticket.contactEmail && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <a href={`mailto:${ticket.contactEmail}`} className="text-sm text-blue-600 hover:underline">{ticket.contactEmail}</a>
-                    </div>
-                  )}
-                  {!ticket.companyName && !ticket.contactName && <p className="text-sm text-gray-400">Non renseigné</p>}
+                  {!ticket.customer && !ticket.companyName && !ticket.contactName && <p className="text-sm text-amber-600">Contact non renseigné</p>}
                 </div>
               </Card>
 
+              {/* Agent assigné */}
               {assignee && (
-                <Card className="p-4">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Agent assigné</h4>
+                <Card className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                  <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Headphones className="w-4 h-4" />
+                    Agent assigné
+                  </h4>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
                       <span className="text-sm font-semibold text-blue-600">{getInitials(assignee.displayName, assignee.email)}</span>
@@ -2492,6 +3308,614 @@ const TicketDetailModal: React.FC<{
 };
 
 // ============================================
+// TICKET DETAIL PAGE (Full page view)
+// ============================================
+
+const TicketDetailPage: React.FC = () => {
+  const { selectedTicket, setSelectedTicket, setCurrentView, users, setTickets } = useAdmin();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('messages');
+  const [editedTicket, setEditedTicket] = useState(selectedTicket!);
+  const [isSaving, setIsSaving] = useState(false);
+  const [documentsCount, setDocumentsCount] = useState(selectedTicket?.attachments?.length || 0);
+  const [draftFromAI, setDraftFromAI] = useState('');
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferReason, setTransferReason] = useState('');
+  const [selectedAgent, setSelectedAgent] = useState('');
+
+  const ticket = selectedTicket!;
+
+  // Agents disponibles pour transfert
+  const availableAgents = users.filter(
+    u => u.role !== UserRole.CUSTOMER && u.id !== editedTicket?.assignedToId && u.isActive !== false
+  );
+
+  const isMyTicket = editedTicket?.assignedToId === user?.id;
+
+  // Charger le compte total des documents
+  useEffect(() => {
+    if (!ticket) return;
+    const loadDocumentsCount = async () => {
+      try {
+        const messages = await AdminApi.getTicketMessages(ticket.id);
+        const messageAttachments = messages.flatMap(m => m.attachments || []);
+        const ticketAttachments = ticket.attachments || [];
+        const allIds = new Set([
+          ...ticketAttachments.map(a => a.id),
+          ...messageAttachments.map(a => a.id)
+        ]);
+        setDocumentsCount(allIds.size);
+      } catch (error) {
+        console.error('Erreur chargement count documents:', error);
+      }
+    };
+    loadDocumentsCount();
+  }, [ticket?.id, ticket?.attachments]);
+
+  // Raccourcis clavier
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+        e.preventDefault();
+        const tabs = ['details', 'messages', 'ai-assistant', 'documents', 'history'];
+        setActiveTab(tabs[parseInt(e.key) - 1]);
+      }
+      if (e.key === 'r' && !e.ctrlKey && !e.metaKey && editedTicket?.status !== TicketStatus.RESOLVED) {
+        e.preventDefault();
+        handleUpdate({ status: TicketStatus.RESOLVED });
+      }
+      if (e.key === 'Escape') {
+        handleBack();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editedTicket?.status]);
+
+  const handleBack = () => {
+    setSelectedTicket(null);
+    setCurrentView('tickets');
+  };
+
+  const handleUpdate = async (updates: Partial<Ticket>) => {
+    if (!ticket) return;
+    setIsSaving(true);
+    try {
+      const updated = await AdminApi.updateTicket(ticket.id, {
+        status: updates.status,
+        priority: updates.priority,
+        assignedToId: updates.assignedToId,
+        tags: updates.tags,
+      });
+      setEditedTicket(updated);
+      setTickets(prev => prev.map(t => t.id === updated.id ? updated : t));
+    } catch (error) {
+      console.error('Erreur mise à jour:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!selectedAgent || !ticket) return;
+    try {
+      await AdminApi.requestTransfer(ticket.id, selectedAgent, transferReason);
+      setShowTransferModal(false);
+      setTransferReason('');
+      setSelectedAgent('');
+      alert('Demande de transfert envoyée avec succès !');
+    } catch (error) {
+      console.error('Erreur transfert:', error);
+      alert('Erreur lors du transfert');
+    }
+  };
+
+  const handleTakeOver = async () => {
+    if (!user) return;
+    await handleUpdate({ assignedToId: user.id });
+  };
+
+  if (!ticket || !editedTicket) return null;
+
+  const assignee = users.find(u => u.id === editedTicket.assignedToId);
+  const ticketAge = Math.floor((Date.now() - new Date(ticket.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+  const customerName = ticket.customer?.displayName || ticket.contactName || ticket.companyName || 'Client';
+
+  return (
+    <div className="h-full flex flex-col bg-gray-50">
+      {/* Header avec retour */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-6 py-4">
+          <div className="flex items-center gap-4 mb-4">
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ChevronRight className="w-5 h-5 rotate-180" />
+              <span className="text-sm font-medium">Retour aux tickets</span>
+            </button>
+            <div className="h-6 w-px bg-gray-300" />
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-lg font-mono font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg">#{ticket.ticketNumber}</span>
+              <Badge className={`${getStatusColor(editedTicket.status)} text-sm px-3 py-1`}>{STATUS_LABELS[editedTicket.status]}</Badge>
+              <Badge className={`${getPriorityColor(editedTicket.priority)} text-sm px-3 py-1`}>{PRIORITY_LABELS[editedTicket.priority]}</Badge>
+              <Badge className="bg-gray-100 text-gray-600 text-sm px-3 py-1">{ISSUE_TYPE_LABELS[editedTicket.issueType]}</Badge>
+              {ticketAge > 0 && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">{ticketAge}j</span>}
+              {isSaving && <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />}
+            </div>
+            <div className="flex-1" />
+            <SLATimer deadline={ticket.slaDeadline || null} breached={editedTicket.slaBreached || false} />
+          </div>
+
+          <h1 className="text-xl font-bold text-gray-900 mb-2">{ticket.title}</h1>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 text-sm text-gray-500">
+              <span className="flex items-center gap-1">
+                <User className="w-4 h-4" />
+                {customerName}
+              </span>
+              {ticket.companyName && (
+                <span className="flex items-center gap-1">
+                  <Building2 className="w-4 h-4" />
+                  {ticket.companyName}
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                {formatDateTime(ticket.createdAt)}
+              </span>
+            </div>
+
+            {/* Agent assigné */}
+            {assignee ? (
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+                <div className="w-7 h-7 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-white">{getInitials(assignee.displayName, assignee.email)}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{assignee.displayName}</p>
+                  <p className="text-[10px] text-gray-500">{ROLE_CONFIG[assignee.role]?.label}</p>
+                </div>
+              </div>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={handleTakeOver} className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200">
+                <User className="w-4 h-4 mr-1" />
+                Prendre en charge
+              </Button>
+            )}
+          </div>
+
+          {/* Barre d'actions rapides */}
+          <div className="mt-4 flex items-center gap-2 flex-wrap">
+            {editedTicket.status === TicketStatus.OPEN && (
+              <Button variant="primary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.IN_PROGRESS })} className="bg-blue-600 hover:bg-blue-700">
+                <PlayCircle className="w-4 h-4 mr-1" />Démarrer
+              </Button>
+            )}
+            {editedTicket.status === TicketStatus.IN_PROGRESS && (
+              <>
+                <Button variant="primary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.RESOLVED })} className="bg-green-600 hover:bg-green-700">
+                  <CheckCircle className="w-4 h-4 mr-1" />Résoudre <span className="ml-1 text-xs opacity-70">(R)</span>
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.WAITING_CUSTOMER })} className="text-yellow-700 border-yellow-300 hover:bg-yellow-50">
+                  <Clock className="w-4 h-4 mr-1" />Attente client
+                </Button>
+              </>
+            )}
+            {editedTicket.status === TicketStatus.WAITING_CUSTOMER && (
+              <Button variant="primary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.IN_PROGRESS })} className="bg-blue-600 hover:bg-blue-700">
+                <PlayCircle className="w-4 h-4 mr-1" />Reprendre
+              </Button>
+            )}
+            {editedTicket.status === TicketStatus.RESOLVED && (
+              <Button variant="secondary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.CLOSED })} className="text-gray-700">
+                <XCircle className="w-4 h-4 mr-1" />Clôturer
+              </Button>
+            )}
+            {(editedTicket.status === TicketStatus.RESOLVED || editedTicket.status === TicketStatus.CLOSED) && (
+              <Button variant="secondary" size="sm" onClick={() => handleUpdate({ status: TicketStatus.REOPENED })} className="text-orange-700 border-orange-300 hover:bg-orange-50">
+                <RefreshCw className="w-4 h-4 mr-1" />Réouvrir
+              </Button>
+            )}
+
+            <div className="h-6 w-px bg-gray-300 mx-1" />
+
+            {editedTicket.status !== TicketStatus.ESCALATED && editedTicket.status !== TicketStatus.CLOSED && (
+              <Button variant="ghost" size="sm" onClick={() => handleUpdate({ status: TicketStatus.ESCALATED })} className="text-red-600 hover:bg-red-50">
+                <AlertTriangle className="w-4 h-4 mr-1" />Escalader
+              </Button>
+            )}
+
+            {isMyTicket && availableAgents.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => setShowTransferModal(true)} className="text-blue-600 hover:bg-blue-50">
+                <ArrowUpRight className="w-4 h-4 mr-1" />Transférer
+              </Button>
+            )}
+
+            <div className="flex-1" />
+
+            {/* Priorité rapide */}
+            <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1">
+              {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as TicketPriority[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => handleUpdate({ priority: p })}
+                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                    editedTicket.priority === p
+                      ? getPriorityColor(p)
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                  }`}
+                  title={PRIORITY_LABELS[p]}
+                >
+                  {p === 'URGENT' ? '🔴' : p === 'HIGH' ? '🟠' : p === 'MEDIUM' ? '🔵' : '⚪'}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-[10px] text-gray-400 hidden lg:block">
+              Ctrl+1-5: onglets • R: résoudre • E: escalader • Esc: retour
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de transfert */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowTransferModal(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <ArrowUpRight className="w-5 h-5 text-blue-600" />
+              Transférer le ticket
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Transférer à</label>
+                <select
+                  value={selectedAgent}
+                  onChange={e => setSelectedAgent(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sélectionner un agent...</option>
+                  {availableAgents.map(agent => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.displayName} ({ROLE_CONFIG[agent.role]?.label})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Raison (optionnel)</label>
+                <textarea
+                  value={transferReason}
+                  onChange={e => setTransferReason(e.target.value)}
+                  placeholder="Pourquoi transférez-vous ce ticket ?"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-20 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button variant="primary" className="flex-1" onClick={handleTransfer} disabled={!selectedAgent}>
+                Envoyer la demande
+              </Button>
+              <Button variant="secondary" onClick={() => setShowTransferModal(false)}>
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <QuickActions ticket={editedTicket} onUpdate={handleUpdate} />
+
+      {/* Contenu principal */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* Zone principale */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-6 pt-4">
+            <Tabs
+              tabs={[
+                { id: 'messages', label: 'Conversation', icon: <MessageSquare className="w-4 h-4" /> },
+                { id: 'details', label: 'Détails', icon: <FileText className="w-4 h-4" /> },
+                { id: 'ai-assistant', label: 'Assistant IA', icon: <Brain className="w-4 h-4" /> },
+                { id: 'documents', label: 'Documents', icon: <FolderOpen className="w-4 h-4" />, count: documentsCount },
+                { id: 'history', label: 'Historique', icon: <History className="w-4 h-4" /> },
+              ]}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+            />
+          </div>
+
+          <div className="flex-1 overflow-auto p-6">
+            {activeTab === 'messages' && (
+              <ChatPanel ticketId={ticket.id} ticket={ticket} initialMessage={draftFromAI} onMessageSent={() => setDraftFromAI('')} />
+            )}
+
+            {activeTab === 'details' && (
+              <div className="grid grid-cols-3 gap-6 max-w-5xl">
+                <div className="col-span-2 space-y-5">
+                  {/* Timeline mini du statut */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                    <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      Progression du ticket
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      {[
+                        { status: 'OPEN', label: 'Ouvert', icon: <AlertCircle className="w-4 h-4" /> },
+                        { status: 'IN_PROGRESS', label: 'En cours', icon: <PlayCircle className="w-4 h-4" /> },
+                        { status: 'WAITING_CUSTOMER', label: 'Attente', icon: <Clock className="w-4 h-4" /> },
+                        { status: 'RESOLVED', label: 'Résolu', icon: <CheckCircle className="w-4 h-4" /> },
+                        { status: 'CLOSED', label: 'Fermé', icon: <XCircle className="w-4 h-4" /> },
+                      ].map((step, i, arr) => {
+                        const statusOrder = ['OPEN', 'IN_PROGRESS', 'WAITING_CUSTOMER', 'RESOLVED', 'CLOSED'];
+                        const currentIndex = statusOrder.indexOf(editedTicket.status);
+                        const stepIndex = statusOrder.indexOf(step.status);
+                        const isPast = stepIndex < currentIndex || (editedTicket.status === 'REOPENED' && step.status === 'OPEN');
+                        const isCurrent = step.status === editedTicket.status || (editedTicket.status === 'REOPENED' && step.status === 'OPEN');
+
+                        return (
+                          <React.Fragment key={step.status}>
+                            <div
+                              className={`flex flex-col items-center gap-1 ${
+                                isCurrent ? 'text-blue-600' : isPast ? 'text-green-600' : 'text-gray-300'
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                isCurrent ? 'bg-blue-600 text-white ring-4 ring-blue-200' :
+                                isPast ? 'bg-green-500 text-white' :
+                                'bg-gray-200 text-gray-400'
+                              }`}>
+                                {isPast && !isCurrent ? <CheckCircle className="w-4 h-4" /> : step.icon}
+                              </div>
+                              <span className="text-[10px] font-medium">{step.label}</span>
+                            </div>
+                            {i < arr.length - 1 && (
+                              <div className={`flex-1 h-1 rounded ${isPast ? 'bg-green-400' : 'bg-gray-200'}`} />
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                    {editedTicket.status === 'ESCALATED' && (
+                      <div className="mt-3 flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="text-sm font-medium">Ticket escaladé - Attention requise</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Description du problème</label>
+                    <div className="mt-2 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                      <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{ticket.description || 'Aucune description fournie.'}</p>
+                    </div>
+                  </div>
+
+                  {/* Équipement */}
+                  {(ticket.serialNumber || ticket.equipmentModel || ticket.equipmentBrand || ticket.errorCode) && (
+                    <Card className="p-4 bg-gradient-to-r from-slate-50 to-gray-50">
+                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Wrench className="w-4 h-4" />
+                        Informations équipement
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {ticket.equipmentBrand && (
+                          <div>
+                            <span className="text-xs text-gray-500">Marque</span>
+                            <p className="font-medium text-gray-900">{ticket.equipmentBrand}</p>
+                          </div>
+                        )}
+                        {ticket.equipmentModel && (
+                          <div>
+                            <span className="text-xs text-gray-500">Modèle</span>
+                            <p className="font-medium text-gray-900">{ticket.equipmentModel}</p>
+                          </div>
+                        )}
+                        {ticket.serialNumber && (
+                          <div>
+                            <span className="text-xs text-gray-500">N° de série</span>
+                            <p className="font-mono font-medium text-gray-900">{ticket.serialNumber}</p>
+                          </div>
+                        )}
+                        {ticket.errorCode && (
+                          <div>
+                            <span className="text-xs text-gray-500">Code erreur</span>
+                            <p className="font-mono font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded inline-block">{ticket.errorCode}</p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Gestion du ticket */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</label>
+                      <Select
+                        value={editedTicket.status}
+                        onChange={e => handleUpdate({ status: e.target.value as TicketStatus })}
+                        options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Priorité</label>
+                      <Select
+                        value={editedTicket.priority}
+                        onChange={e => handleUpdate({ priority: e.target.value as TicketPriority })}
+                        options={Object.entries(PRIORITY_LABELS).map(([value, label]) => ({ value, label }))}
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigné à</label>
+                    <Select
+                      value={editedTicket.assignedToId || ''}
+                      onChange={e => handleUpdate({ assignedToId: e.target.value || undefined })}
+                      options={users.filter(u => u.role !== UserRole.CUSTOMER).map(u => ({
+                        value: u.id,
+                        label: `${u.displayName} (${ROLE_CONFIG[u.role]?.label || u.role})`
+                      }))}
+                      placeholder="Non assigné"
+                      className="mt-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Contact client amélioré */}
+                  <Card className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+                    <h4 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Client
+                    </h4>
+                    <div className="space-y-3">
+                      {/* Afficher le compte client si disponible */}
+                      {ticket.customer && (
+                        <div className="flex items-center gap-2 p-2 bg-amber-100/50 rounded-lg">
+                          <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-bold text-white">{getInitials(ticket.customer.displayName, ticket.customer.email)}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{ticket.customer.displayName}</p>
+                            <p className="text-[10px] text-amber-600">Compte client</p>
+                          </div>
+                        </div>
+                      )}
+                      {ticket.companyName && (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-amber-600" />
+                          <span className="text-sm font-semibold text-gray-900">{ticket.companyName}</span>
+                        </div>
+                      )}
+                      {ticket.contactName && !ticket.customer && (
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-amber-600" />
+                          <span className="text-sm text-gray-700">{ticket.contactName}</span>
+                        </div>
+                      )}
+                      {/* Téléphone : priorité au compte client, puis contact manuel */}
+                      {(ticket.customer?.phone || ticket.contactPhone) && (
+                        <a href={`tel:${ticket.customer?.phone || ticket.contactPhone}`} className="flex items-center gap-2 p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors group">
+                          <Phone className="w-4 h-4 text-green-600" />
+                          <span className="text-sm text-blue-600 group-hover:underline">{ticket.customer?.phone || ticket.contactPhone}</span>
+                          <span className="ml-auto text-xs text-gray-400">Appeler</span>
+                        </a>
+                      )}
+                      {/* Email : priorité au compte client, puis contact manuel - un email par ligne */}
+                      {(ticket.customer?.email || ticket.contactEmail) && (
+                        <div className="space-y-1">
+                          {(ticket.customer?.email || ticket.contactEmail || '').split(/[;,]/).map((email, idx) => {
+                            const trimmedEmail = email.trim();
+                            if (!trimmedEmail) return null;
+                            return (
+                              <a key={idx} href={`mailto:${trimmedEmail}`} className="flex items-center gap-2 p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors group">
+                                <Mail className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm text-blue-600 group-hover:underline">{trimmedEmail}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {!ticket.customer && !ticket.companyName && !ticket.contactName && <p className="text-sm text-amber-600">Contact non renseigné</p>}
+                    </div>
+                  </Card>
+
+                  {/* Agent assigné */}
+                  {assignee && (
+                    <Card className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                      <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Headphones className="w-4 h-4" />
+                        Agent assigné
+                      </h4>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-semibold text-blue-600">{getInitials(assignee.displayName, assignee.email)}</span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{assignee.displayName}</p>
+                          <Badge className={`text-[10px] ${ROLE_CONFIG[assignee.role]?.color}`}>{ROLE_CONFIG[assignee.role]?.label}</Badge>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  <Card className="p-4">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Dates</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Créé</span>
+                        <span className="text-gray-900">{formatDateTime(ticket.createdAt)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Mis à jour</span>
+                        <span className="text-gray-900">{formatDateTime(ticket.updatedAt)}</span>
+                      </div>
+                      {ticket.slaDeadline && (
+                        <div className={`flex justify-between ${ticket.slaBreached ? 'text-red-600' : ''}`}>
+                          <span className="text-gray-500">SLA</span>
+                          <span>{formatDateTime(ticket.slaDeadline)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'ai-assistant' && (
+              <AIAssistantPanel
+                ticketId={ticket.id}
+                ticket={ticket}
+                onUseDraft={(draft) => {
+                  setDraftFromAI(draft);
+                  setActiveTab('messages');
+                }}
+              />
+            )}
+
+            {activeTab === 'documents' && (
+              <DocumentsPanel ticketId={ticket.id} attachments={ticket.attachments || []} />
+            )}
+
+            {activeTab === 'history' && (
+              <div className="max-w-2xl">
+                {ticket.history && ticket.history.length > 0 ? (
+                  <div className="relative pl-8 space-y-6">
+                    <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-gray-200" />
+                    {ticket.history.map(h => (
+                      <div key={h.id} className="relative">
+                        <div className="absolute -left-5 w-4 h-4 bg-white border-2 border-gray-300 rounded-full" />
+                        <div className="bg-gray-50 rounded-xl p-4">
+                          <p className="text-sm font-medium text-gray-900">{h.action}</p>
+                          {h.field && <p className="text-xs text-gray-500 mt-1">{h.field}: {h.oldValue} → {h.newValue}</p>}
+                          <p className="text-xs text-gray-400 mt-2">{formatDateTime(h.createdAt)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-400">
+                    <History className="w-12 h-12 mx-auto mb-3" />
+                    <p>Aucun historique disponible</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
 // DASHBOARD VIEW
 // ============================================
 
@@ -2502,6 +3926,7 @@ const TicketDetailModal: React.FC<{
 const AIAutoBotPanel: React.FC = () => {
   const [isEnabled, setIsEnabled] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [aiSettings, setAiSettings] = useState({
     autoRespond: true,
     maxResponsesPerTicket: 3,
@@ -2510,22 +3935,47 @@ const AIAutoBotPanel: React.FC = () => {
     respondToTypes: ['TECHNICAL', 'DELIVERY', 'BILLING', 'OTHER'] as string[],
   });
 
-  // Mock AI stats - would be from API in real implementation
-  const aiStats = {
-    ticketsHandled: 47,
-    ticketsResolved: 23,
+  // Stats réelles depuis l'API
+  const [aiStats, setAiStats] = useState({
+    ticketsHandled: 0,
+    ticketsResolved: 0,
     avgResponseTime: '< 1 min',
-    satisfactionRate: 89,
-    currentlyActive: 5,
-  };
+    satisfactionRate: 0,
+    currentlyActive: 0,
+  });
 
-  // Mock recent AI conversations
-  const recentAIConversations = [
-    { id: '1', ticketNumber: 1045, status: 'resolved', messages: 3, resolvedWithoutHuman: true },
-    { id: '2', ticketNumber: 1044, status: 'escalated', messages: 2, resolvedWithoutHuman: false },
-    { id: '3', ticketNumber: 1043, status: 'active', messages: 1, resolvedWithoutHuman: false },
-    { id: '4', ticketNumber: 1042, status: 'resolved', messages: 4, resolvedWithoutHuman: true },
-  ];
+  // Conversations réelles depuis l'API
+  const [recentAIConversations, setRecentAIConversations] = useState<Array<{
+    id: string;
+    ticketId: string;
+    ticketNumber: number;
+    ticketTitle: string;
+    status: 'resolved' | 'escalated' | 'active';
+    messages: number;
+    resolvedWithoutHuman: boolean;
+    lastActivity: string;
+  }>>([]);
+
+  // Charger les données au montage
+  useEffect(() => {
+    const loadAutoBotData = async () => {
+      setIsLoading(true);
+      try {
+        const [statsData, conversationsData] = await Promise.all([
+          AdminApi.getAutoBotStats(),
+          AdminApi.getAutoBotConversations(10),
+        ]);
+        setAiStats(statsData);
+        setRecentAIConversations(conversationsData);
+      } catch (error) {
+        console.error('Erreur chargement données AutoBot:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAutoBotData();
+  }, []);
 
   return (
     <Card className="overflow-hidden">
@@ -2563,26 +4013,35 @@ const AIAutoBotPanel: React.FC = () => {
 
       {/* AI Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-gray-50 border-b">
-        <div className="text-center">
-          <p className="text-2xl font-bold text-purple-600">{aiStats.ticketsHandled}</p>
-          <p className="text-xs text-gray-500">Tickets traités</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold text-green-600">{aiStats.ticketsResolved}</p>
-          <p className="text-xs text-gray-500">Résolus par IA</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold text-blue-600">{aiStats.avgResponseTime}</p>
-          <p className="text-xs text-gray-500">Temps réponse</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold text-amber-600">{aiStats.satisfactionRate}%</p>
-          <p className="text-xs text-gray-500">Satisfaction</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold text-indigo-600">{aiStats.currentlyActive}</p>
-          <p className="text-xs text-gray-500">Conv. actives</p>
-        </div>
+        {isLoading ? (
+          <div className="col-span-5 flex items-center justify-center py-4">
+            <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+            <span className="ml-2 text-sm text-gray-500">Chargement des statistiques...</span>
+          </div>
+        ) : (
+          <>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-purple-600">{aiStats.ticketsHandled}</p>
+              <p className="text-xs text-gray-500">Tickets traités</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-600">{aiStats.ticketsResolved}</p>
+              <p className="text-xs text-gray-500">Résolus par IA</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-blue-600">{aiStats.avgResponseTime}</p>
+              <p className="text-xs text-gray-500">Temps réponse</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-amber-600">{aiStats.satisfactionRate}%</p>
+              <p className="text-xs text-gray-500">Taux résolution</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-indigo-600">{aiStats.currentlyActive}</p>
+              <p className="text-xs text-gray-500">Conv. actives</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Settings Panel */}
@@ -2656,41 +4115,56 @@ const AIAutoBotPanel: React.FC = () => {
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-gray-900">Conversations IA récentes</h3>
-          <span className="text-xs text-gray-500">{recentAIConversations.length} dernières</span>
+          <span className="text-xs text-gray-500">{recentAIConversations.length} ticket{recentAIConversations.length > 1 ? 's' : ''}</span>
         </div>
         <div className="space-y-3">
-          {recentAIConversations.map(conv => (
-            <div key={conv.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                conv.status === 'resolved' ? 'bg-green-100' :
-                conv.status === 'escalated' ? 'bg-orange-100' : 'bg-blue-100'
-              }`}>
-                {conv.status === 'resolved' ? <CheckCircle className="w-5 h-5 text-green-600" /> :
-                 conv.status === 'escalated' ? <ArrowUpRight className="w-5 h-5 text-orange-600" /> :
-                 <MessageSquare className="w-5 h-5 text-blue-600" />}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">Ticket #{conv.ticketNumber}</span>
-                  {conv.resolvedWithoutHuman && (
-                    <Badge className="bg-green-100 text-green-700 text-[10px]">
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      Résolu sans humain
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500">{conv.messages} message{conv.messages > 1 ? 's' : ''} échangé{conv.messages > 1 ? 's' : ''}</p>
-              </div>
-              <Badge className={
-                conv.status === 'resolved' ? 'bg-green-100 text-green-700' :
-                conv.status === 'escalated' ? 'bg-orange-100 text-orange-700' :
-                'bg-blue-100 text-blue-700'
-              }>
-                {conv.status === 'resolved' ? 'Résolu' :
-                 conv.status === 'escalated' ? 'Escaladé' : 'En cours'}
-              </Badge>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-purple-500" />
+              <span className="ml-2 text-sm text-gray-500">Chargement...</span>
             </div>
-          ))}
+          ) : recentAIConversations.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Brain className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">Aucune conversation IA pour le moment</p>
+              <p className="text-xs text-gray-400 mt-1">Les conversations apparaîtront ici lorsque l'IA répondra aux tickets</p>
+            </div>
+          ) : (
+            recentAIConversations.map(conv => (
+              <div key={conv.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  conv.status === 'resolved' ? 'bg-green-100' :
+                  conv.status === 'escalated' ? 'bg-orange-100' : 'bg-blue-100'
+                }`}>
+                  {conv.status === 'resolved' ? <CheckCircle className="w-5 h-5 text-green-600" /> :
+                   conv.status === 'escalated' ? <ArrowUpRight className="w-5 h-5 text-orange-600" /> :
+                   <MessageSquare className="w-5 h-5 text-blue-600" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-900">Ticket #{conv.ticketNumber}</span>
+                    {conv.resolvedWithoutHuman && (
+                      <Badge className="bg-green-100 text-green-700 text-[10px]">
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Résolu sans humain
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 truncate" title={conv.ticketTitle}>
+                    {conv.messages} message{conv.messages > 1 ? 's' : ''} IA • {conv.ticketTitle}
+                  </p>
+                </div>
+                <Badge className={
+                  conv.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                  conv.status === 'escalated' ? 'bg-orange-100 text-orange-700' :
+                  'bg-blue-100 text-blue-700'
+                }>
+                  {conv.status === 'resolved' ? 'Résolu' :
+                   conv.status === 'escalated' ? 'Escaladé' : 'En cours'}
+                </Badge>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -2734,7 +4208,11 @@ const AIAutoBotPanel: React.FC = () => {
 
 const DashboardView: React.FC = () => {
   const { tickets, stats, setShowAIAssistant, setCurrentView, setSelectedTicket, autoAssignTickets, users } = useAdmin();
+  const { user } = useAuth();
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
+
+  // Vérifier si l'utilisateur est ADMIN ou SUPERVISOR (comparaison string pour compatibilité API)
+  const isManagerRole = ['ADMIN', 'SUPERVISOR'].includes(user?.role as string);
 
   const openCount = stats?.byStatus?.[TicketStatus.OPEN] || 0;
   const inProgressCount = stats?.byStatus?.[TicketStatus.IN_PROGRESS] || 0;
@@ -2816,7 +4294,7 @@ const DashboardView: React.FC = () => {
                       {!t.assignedToId && <Badge className="bg-orange-100 text-orange-700 text-[10px]">Non assigné</Badge>}
                     </div>
                     <p className="text-sm font-medium text-gray-900 line-clamp-1">{t.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">{t.companyName || t.contactName || 'Client'} • {formatDateTime(t.createdAt)}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t.customer?.displayName || t.companyName || t.contactName || 'Client'} • {formatDateTime(t.createdAt)}</p>
                   </div>
                   <Badge className={getStatusColor(t.status)}>{STATUS_LABELS[t.status]}</Badge>
                 </div>
@@ -2860,29 +4338,31 @@ const DashboardView: React.FC = () => {
             </div>
           </Card>
 
-          {/* Équipe */}
-          <Card className="p-4">
-            <h3 className="font-semibold text-gray-900 mb-4">Équipe disponible</h3>
-            <div className="space-y-3">
-              {users.filter(u => u.role !== UserRole.CUSTOMER).slice(0, 4).map(u => (
-                <div key={u.id} className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-semibold text-blue-600">{getInitials(u.displayName, u.email)}</span>
+          {/* Équipe - Visible uniquement pour ADMIN et SUPERVISOR */}
+          {isManagerRole && (
+            <Card className="p-4">
+              <h3 className="font-semibold text-gray-900 mb-4">Équipe disponible</h3>
+              <div className="space-y-3">
+                {users.filter(u => u.role !== UserRole.CUSTOMER).slice(0, 4).map(u => (
+                  <div key={u.id} className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-semibold text-blue-600">{getInitials(u.displayName, u.email)}</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{u.displayName}</p>
+                      <p className="text-xs text-gray-500">{u._count?.assignedTickets || 0} tickets</p>
+                    </div>
+                    <div className={`w-2 h-2 rounded-full ${u.isActive !== false ? 'bg-green-500' : 'bg-gray-300'}`} />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">{u.displayName}</p>
-                    <p className="text-xs text-gray-500">{u._count?.assignedTickets || 0} tickets</p>
-                  </div>
-                  <div className={`w-2 h-2 rounded-full ${u.isActive !== false ? 'bg-green-500' : 'bg-gray-300'}`} />
-                </div>
-              ))}
-            </div>
-          </Card>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
 
-      {/* AI AutoBot Panel */}
-      <AIAutoBotPanel />
+      {/* AI AutoBot Panel - Visible uniquement pour ADMIN et SUPERVISOR */}
+      {isManagerRole && <AIAutoBotPanel />}
     </div>
   );
 };
@@ -2896,14 +4376,27 @@ const TicketQuickActions: React.FC<{
   onUpdate: (updated: Ticket) => void;
   onView: () => void;
 }> = ({ ticket, onUpdate, onView }) => {
+  const { users } = useAdmin();
+  const { user } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showTransferMenu, setShowTransferMenu] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Agents disponibles pour le transfert (exclure le propriétaire actuel et soi-même)
+  const availableAgents = users.filter(
+    u => u.role !== UserRole.CUSTOMER && u.id !== ticket.assignedToId && u.id !== user?.id && u.isActive !== false
+  );
+
+  // Vérifier si le ticket m'appartient (pour autoriser le transfert)
+  const isMyTicket = ticket.assignedToId === user?.id;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
+        setShowTransferMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -2921,6 +4414,22 @@ const TicketQuickActions: React.FC<{
       console.error('Erreur changement statut:', error);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleTransfer = async (toAgentId: string) => {
+    if (isTransferring) return;
+    setIsTransferring(true);
+    try {
+      await AdminApi.requestTransfer(ticket.id, toAgentId);
+      setShowTransferMenu(false);
+      setShowMenu(false);
+      alert('Demande de transfert envoyée !');
+    } catch (error) {
+      console.error('Erreur transfert:', error);
+      alert('Erreur lors du transfert');
+    } finally {
+      setIsTransferring(false);
     }
   };
 
@@ -2988,6 +4497,45 @@ const TicketQuickActions: React.FC<{
           ))}
           {availableActions.length === 0 && (
             <p className="px-3 py-2 text-xs text-gray-400">Aucune action disponible</p>
+          )}
+
+          {/* Option de transfert */}
+          {isMyTicket && availableAgents.length > 0 && (
+            <>
+              <div className="my-1 border-t border-gray-100" />
+              <div className="px-3 py-2 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase">Transférer à</p>
+              </div>
+              {showTransferMenu ? (
+                <div className="max-h-40 overflow-y-auto">
+                  {availableAgents.map(agent => (
+                    <button
+                      key={agent.id}
+                      onClick={() => handleTransfer(agent.id)}
+                      disabled={isTransferring}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-gray-700 disabled:opacity-50"
+                    >
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-blue-600">{getInitials(agent.displayName, agent.email)}</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{agent.displayName}</p>
+                        <p className="text-[10px] text-gray-400">{agent.role}</p>
+                      </div>
+                      {isTransferring && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowTransferMenu(true)}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-blue-600"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                  Transférer ce ticket...
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -3157,12 +4705,131 @@ const DateRangeFilter: React.FC<{
 // ============================================
 
 const TicketsView: React.FC = () => {
-  const { tickets, setTickets, selectedTicket, setSelectedTicket, users, refreshData, autoAssignTickets, unreadByTicket } = useAdmin();
+  const { tickets, setTickets, selectedTicket, setSelectedTicket, users, refreshData, autoAssignTickets, unreadByTicket, setCurrentView } = useAdmin();
   const [filters, setFilters] = useState({ status: '', priority: '', search: '', assignedToId: '', dateFrom: '', dateTo: '', issueType: '' });
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
+  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
+
+  // Gestion de la sélection
+  const toggleTicketSelection = (ticketId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTicketIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(ticketId)) {
+        newSet.delete(ticketId);
+      } else {
+        newSet.add(ticketId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTicketIds.size === paginatedTickets.length) {
+      setSelectedTicketIds(new Set());
+    } else {
+      setSelectedTicketIds(new Set(paginatedTickets.map(t => t.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedTicketIds(new Set());
+
+  // États pour les dropdowns d'actions groupées
+  const [showBulkAssignDropdown, setShowBulkAssignDropdown] = useState(false);
+  const [showBulkStatusDropdown, setShowBulkStatusDropdown] = useState(false);
+  const [showBulkPriorityDropdown, setShowBulkPriorityDropdown] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  // Actions groupées
+  const handleBulkAssign = async (agentId: string | null) => {
+    setIsBulkUpdating(true);
+    try {
+      const promises = Array.from(selectedTicketIds).map(ticketId =>
+        AdminApi.updateTicket(ticketId, { assignedToId: agentId })
+      );
+      await Promise.all(promises);
+      await refreshData();
+      clearSelection();
+    } catch (error) {
+      console.error('Erreur assignation groupée:', error);
+    } finally {
+      setIsBulkUpdating(false);
+      setShowBulkAssignDropdown(false);
+    }
+  };
+
+  const handleBulkStatus = async (status: TicketStatus) => {
+    setIsBulkUpdating(true);
+    try {
+      const promises = Array.from(selectedTicketIds).map(ticketId =>
+        AdminApi.updateTicket(ticketId, { status })
+      );
+      await Promise.all(promises);
+      await refreshData();
+      clearSelection();
+    } catch (error) {
+      console.error('Erreur changement statut groupé:', error);
+    } finally {
+      setIsBulkUpdating(false);
+      setShowBulkStatusDropdown(false);
+    }
+  };
+
+  const handleBulkPriority = async (priority: TicketPriority) => {
+    setIsBulkUpdating(true);
+    try {
+      const promises = Array.from(selectedTicketIds).map(ticketId =>
+        AdminApi.updateTicket(ticketId, { priority })
+      );
+      await Promise.all(promises);
+      await refreshData();
+      clearSelection();
+    } catch (error) {
+      console.error('Erreur changement priorité groupée:', error);
+    } finally {
+      setIsBulkUpdating(false);
+      setShowBulkPriorityDropdown(false);
+    }
+  };
+
+  // Ouvrir un ticket dans la modal
+  const openTicketModal = (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+  };
+
+  // Ref pour suivre le statut précédent
+  const prevStatusRef = useRef(filters.status);
+
+  // Recharger les tickets quand on change de filtre de statut
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    const currentStatus = filters.status;
+    prevStatusRef.current = currentStatus;
+
+    const loadFilteredTickets = async () => {
+      // Si on filtre par RESOLVED ou CLOSED, charger ces tickets spécifiquement
+      if (currentStatus === TicketStatus.RESOLVED || currentStatus === TicketStatus.CLOSED) {
+        setIsLoadingFiltered(true);
+        try {
+          const res = await AdminApi.getTickets({ limit: 100, status: currentStatus as TicketStatus });
+          setTickets(res.data || []);
+        } catch (error) {
+          console.error('Erreur chargement tickets filtrés:', error);
+        } finally {
+          setIsLoadingFiltered(false);
+        }
+      }
+      // Si on revient de RESOLVED/CLOSED vers un autre filtre ou "tous", recharger les tickets actifs
+      else if (prevStatus === TicketStatus.RESOLVED || prevStatus === TicketStatus.CLOSED) {
+        refreshData();
+      }
+    };
+    loadFilteredTickets();
+  }, [filters.status]);
 
   const filteredTickets = useMemo(() => tickets.filter(t => {
     if (filters.status && t.status !== filters.status) return false;
@@ -3170,6 +4837,7 @@ const TicketsView: React.FC = () => {
     if (filters.assignedToId && t.assignedToId !== filters.assignedToId) return false;
     if (filters.issueType && t.issueType !== filters.issueType) return false;
     if (filters.search && !t.title.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !(t.customer?.displayName?.toLowerCase().includes(filters.search.toLowerCase())) &&
         !(t.contactName?.toLowerCase().includes(filters.search.toLowerCase())) &&
         !(t.companyName?.toLowerCase().includes(filters.search.toLowerCase()))) return false;
     if (filters.dateFrom) {
@@ -3288,33 +4956,163 @@ const TicketsView: React.FC = () => {
         )}
       </div>
 
+      {/* Barre d'actions groupées */}
+      {selectedTicketIds.size > 0 && (
+        <div className="mx-4 mb-2 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg flex items-center justify-between">
+          <div className="flex items-center gap-3 text-white">
+            <span className="font-medium">{selectedTicketIds.size} ticket{selectedTicketIds.size > 1 ? 's' : ''} sélectionné{selectedTicketIds.size > 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Dropdown Assigner */}
+            <div className="relative">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+                onClick={() => { setShowBulkAssignDropdown(!showBulkAssignDropdown); setShowBulkStatusDropdown(false); setShowBulkPriorityDropdown(false); }}
+                disabled={isBulkUpdating}
+              >
+                <UserPlus className="w-4 h-4 mr-1" />Assigner
+              </Button>
+              {showBulkAssignDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-xl border z-50 py-1 max-h-60 overflow-y-auto">
+                  <button
+                    onClick={() => handleBulkAssign(null)}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-600"
+                  >
+                    Non assigné
+                  </button>
+                  {users.filter(u => ['ADMIN', 'SUPERVISOR', 'AGENT'].includes(u.role)).map(agent => (
+                    <button
+                      key={agent.id}
+                      onClick={() => handleBulkAssign(agent.id)}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
+                        {agent.displayName.charAt(0)}
+                      </div>
+                      <span className="text-gray-800">{agent.displayName}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Dropdown Statut */}
+            <div className="relative">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+                onClick={() => { setShowBulkStatusDropdown(!showBulkStatusDropdown); setShowBulkAssignDropdown(false); setShowBulkPriorityDropdown(false); }}
+                disabled={isBulkUpdating}
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />Statut
+              </Button>
+              {showBulkStatusDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-40 bg-white rounded-lg shadow-xl border z-50 py-1">
+                  {Object.entries(STATUS_LABELS).map(([status, label]) => (
+                    <button
+                      key={status}
+                      onClick={() => handleBulkStatus(status as TicketStatus)}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Badge className={getStatusColor(status as TicketStatus)}>{label}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Dropdown Priorité */}
+            <div className="relative">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+                onClick={() => { setShowBulkPriorityDropdown(!showBulkPriorityDropdown); setShowBulkAssignDropdown(false); setShowBulkStatusDropdown(false); }}
+                disabled={isBulkUpdating}
+              >
+                <AlertTriangle className="w-4 h-4 mr-1" />Priorité
+              </Button>
+              {showBulkPriorityDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-36 bg-white rounded-lg shadow-xl border z-50 py-1">
+                  {Object.entries(PRIORITY_LABELS).map(([priority, label]) => (
+                    <button
+                      key={priority}
+                      onClick={() => handleBulkPriority(priority as TicketPriority)}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Badge className={getPriorityColor(priority as TicketPriority)}>{label}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Bouton fermer */}
+            <button
+              onClick={clearSelection}
+              className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors"
+              disabled={isBulkUpdating}
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+          {isBulkUpdating && (
+            <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-white animate-spin" />
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto p-4">
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Titre</th>
+                  <th className="px-3 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={paginatedTickets.length > 0 && selectedTicketIds.size === paginatedTickets.length}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Ticket</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Priorité</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigné</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">IA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Priorité</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SLA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigné à</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {paginatedTickets.map(t => {
                   const assignee = users.find(u => u.id === t.assignedToId);
-                  const hasAIResponse = Math.random() > 0.5; // Mock - would be real data
                   const unreadCount = unreadByTicket.get(t.id) || 0;
+                  const isSelected = selectedTicketIds.has(t.id);
+                  const clientName = t.customer?.displayName || t.companyName || t.contactName;
+                  const clientEmail = t.customer?.email || t.contactEmail;
+
                   return (
                     <tr
                       key={t.id}
-                      className={`hover:bg-blue-50 transition-colors cursor-pointer ${unreadCount > 0 ? 'bg-blue-50/30' : ''}`}
-                      onClick={() => setSelectedTicket(t)}
+                      className={`hover:bg-blue-50 transition-colors cursor-pointer ${isSelected ? 'bg-blue-50' : ''} ${unreadCount > 0 ? 'bg-blue-50/30' : ''}`}
+                      onClick={() => openTicketModal(t)}
                     >
+                      <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          onClick={(e) => toggleTicketSelection(t.id, e)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-mono font-semibold text-blue-600">#{t.ticketNumber}</span>
@@ -3325,42 +5123,56 @@ const TicketsView: React.FC = () => {
                             </span>
                           )}
                         </div>
+                        <p className="text-sm font-medium text-gray-900 line-clamp-1 max-w-xs mt-1">{t.title}</p>
+                        <p className="text-xs text-gray-400">{ISSUE_TYPE_LABELS[t.issueType]} • {formatDateTime(t.createdAt)}</p>
                       </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-1 max-w-xs">{t.title}</p>
-                        <p className="text-xs text-gray-500">{ISSUE_TYPE_LABELS[t.issueType]} • {formatDateTime(t.createdAt)}</p>
+                      <td className="px-4 py-3">
+                        {clientName ? (
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{clientName}</p>
+                            {clientEmail && <p className="text-xs text-gray-500 truncate max-w-[200px]">{clientEmail}</p>}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{t.companyName || t.contactName || '-'}</td>
-                      <td className="px-4 py-3"><Badge className={getPriorityColor(t.priority)}>{PRIORITY_LABELS[t.priority]}</Badge></td>
                       <td className="px-4 py-3"><Badge className={getStatusColor(t.status)}>{STATUS_LABELS[t.status]}</Badge></td>
+                      <td className="px-4 py-3"><Badge className={getPriorityColor(t.priority)}>{PRIORITY_LABELS[t.priority]}</Badge></td>
+                      <td className="px-4 py-3">
+                        {t.slaDeadline ? (
+                          <SLATimer deadline={t.slaDeadline} breached={t.slaBreached || false} compact />
+                        ) : (
+                          <span className="text-xs text-gray-400">Pas de SLA</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {assignee ? (
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-[10px] font-semibold text-blue-600">{getInitials(assignee.displayName, assignee.email)}</span>
+                            <div className="w-7 h-7 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
+                              <span className="text-[10px] font-bold text-white">{getInitials(assignee.displayName, assignee.email)}</span>
                             </div>
-                            <span className="text-sm text-gray-600">{assignee.displayName}</span>
+                            <span className="text-sm text-gray-700">{assignee.displayName}</span>
                           </div>
                         ) : (
-                          <span className="text-sm text-orange-500 font-medium">Non assigné</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {hasAIResponse ? (
-                          <div className="flex items-center gap-1" title="IA a répondu">
-                            <Brain className="w-4 h-4 text-purple-500" />
-                            <span className="text-xs text-purple-600">Active</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
+                          <Badge className="bg-orange-100 text-orange-700">Non assigné</Badge>
                         )}
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <TicketQuickActions
-                          ticket={t}
-                          onUpdate={(updated) => setTickets(prev => prev.map(ticket => ticket.id === updated.id ? updated : ticket))}
-                          onView={() => setSelectedTicket(t)}
-                        />
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => openTicketModal(t)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Ouvrir"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Statistiques"
+                          >
+                            <BarChart3 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -3368,7 +5180,13 @@ const TicketsView: React.FC = () => {
               </tbody>
             </table>
           </div>
-          {filteredTickets.length === 0 && (
+          {isLoadingFiltered && (
+            <div className="p-12 text-center">
+              <RefreshCw className="w-8 h-8 text-blue-500 mx-auto mb-3 animate-spin" />
+              <p className="text-gray-500">Chargement des tickets...</p>
+            </div>
+          )}
+          {!isLoadingFiltered && filteredTickets.length === 0 && (
             <div className="p-12 text-center">
               <TicketIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">Aucun ticket trouvé</p>
@@ -3388,7 +5206,362 @@ const TicketsView: React.FC = () => {
         </Card>
       </div>
 
-      {selectedTicket && <TicketDetailModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} onUpdate={handleTicketUpdate} />}
+      {/* Modal de détail du ticket */}
+      {selectedTicket && (
+        <TicketDetailModal
+          ticket={selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+          onUpdate={handleTicketUpdate}
+        />
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// CLIENTS LIST VIEW
+// ============================================
+
+interface ClientWithTickets {
+  id: string;
+  email: string;
+  phone: string | null;
+  displayName: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+  isActive: boolean;
+  totalTickets: number;
+  openTickets: number;
+  lastTicket: {
+    id: string;
+    ticketNumber: number;
+    title: string;
+    status: string;
+    priority: string;
+    createdAt: string;
+  } | null;
+  recentTickets: Array<{
+    id: string;
+    ticketNumber: number;
+    title: string;
+    status: string;
+    priority: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
+const ClientsListView: React.FC = () => {
+  const { setCurrentView } = useAdmin();
+  const [clients, setClients] = useState<ClientWithTickets[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
+  const [selectedClient, setSelectedClient] = useState<ClientWithTickets | null>(null);
+
+  const loadClients = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await AdminApi.getClientsWithTickets({
+        search: searchTerm || undefined,
+        page,
+        limit: 20,
+      });
+      setClients(result.clients);
+      setPagination(result.pagination);
+    } catch (error) {
+      console.error('Erreur chargement clients:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, page]);
+
+  useEffect(() => {
+    loadClients();
+  }, [loadClients]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Liste des clients</h1>
+          <p className="text-gray-500">Clients ayant ouvert un ou plusieurs tickets SAV</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge className="bg-blue-100 text-blue-700 text-sm px-3 py-1">
+            {pagination.total} client{pagination.total > 1 ? 's' : ''}
+          </Badge>
+          <Button variant="secondary" onClick={loadClients} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <Card className="p-4">
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher par nom, email ou téléphone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Clients list */}
+      <Card>
+        {loading ? (
+          <div className="p-12 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        ) : clients.length === 0 ? (
+          <div className="p-12 text-center">
+            <UserCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">Aucun client trouvé</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Client</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Contact</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Tickets</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Dernier ticket</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Inscrit le</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {clients.map((client) => (
+                  <tr key={client.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-semibold text-purple-600">
+                            {client.displayName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{client.displayName}</p>
+                          <p className="text-xs text-gray-500">ID: {client.id.slice(0, 8)}...</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline">{client.email}</a>
+                        </div>
+                        {client.phone && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="w-4 h-4 text-gray-400" />
+                            <a href={`tel:${client.phone}`} className="text-gray-600 hover:text-gray-900">{client.phone}</a>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge className="bg-blue-100 text-blue-700">{client.totalTickets} total</Badge>
+                        {client.openTickets > 0 && (
+                          <Badge className="bg-amber-100 text-amber-700">{client.openTickets} ouvert{client.openTickets > 1 ? 's' : ''}</Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {client.lastTicket ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Hash className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-medium text-gray-900">#{client.lastTicket.ticketNumber}</span>
+                            <Badge className={getStatusColor(client.lastTicket.status as TicketStatus)}>
+                              {STATUS_LABELS[client.lastTicket.status as TicketStatus] || client.lastTicket.status}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{client.lastTicket.title}</p>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-gray-600">{formatDate(client.createdAt)}</div>
+                      {client.lastSeenAt && (
+                        <div className="text-xs text-gray-400">Vu le {formatDateTime(client.lastSeenAt)}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedClient(client)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <p className="text-sm text-gray-500">
+              Page {page} sur {pagination.totalPages} ({pagination.total} clients)
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={page === pagination.totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Client detail modal */}
+      {selectedClient && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedClient(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center">
+                  <span className="text-xl font-bold text-purple-600">
+                    {selectedClient.displayName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{selectedClient.displayName}</h2>
+                  <p className="text-gray-500">{selectedClient.email}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedClient(null)} className="p-2 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
+              {/* Infos contact */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Email</p>
+                  <p className="font-medium text-gray-900">{selectedClient.email}</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Téléphone</p>
+                  <p className="font-medium text-gray-900">{selectedClient.phone || '-'}</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Inscrit le</p>
+                  <p className="font-medium text-gray-900">{formatDateTime(selectedClient.createdAt)}</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Dernière activité</p>
+                  <p className="font-medium text-gray-900">{selectedClient.lastSeenAt ? formatDateTime(selectedClient.lastSeenAt) : '-'}</p>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <p className="text-3xl font-bold text-blue-600">{selectedClient.totalTickets}</p>
+                  <p className="text-sm text-blue-600">Total tickets</p>
+                </div>
+                <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                  <p className="text-3xl font-bold text-amber-600">{selectedClient.openTickets}</p>
+                  <p className="text-sm text-amber-600">Tickets ouverts</p>
+                </div>
+              </div>
+
+              {/* Recent tickets */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Tickets récents</h3>
+                <div className="space-y-2">
+                  {selectedClient.recentTickets.length === 0 ? (
+                    <p className="text-gray-400 text-center py-4">Aucun ticket</p>
+                  ) : (
+                    selectedClient.recentTickets.map((ticket) => (
+                      <div
+                        key={ticket.id}
+                        className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setSelectedClient(null);
+                          setCurrentView('tickets');
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-gray-900">#{ticket.ticketNumber}</span>
+                            <Badge className={getStatusColor(ticket.status as TicketStatus)}>
+                              {STATUS_LABELS[ticket.status as TicketStatus] || ticket.status}
+                            </Badge>
+                            <Badge className={getPriorityColor(ticket.priority as TicketPriority)}>
+                              {PRIORITY_LABELS[ticket.priority as TicketPriority] || ticket.priority}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-gray-400">{formatDate(ticket.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1 truncate">{ticket.title}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -3400,7 +5573,9 @@ const TicketsView: React.FC = () => {
 const TeamView: React.FC = () => {
   const { users, refreshData } = useAdmin();
   const { hasPermission } = useAuth();
-  const staffUsers = users.filter(u => u.role !== UserRole.CUSTOMER);
+  // Filter staff users (not CUSTOMER) - check both enum and string formats
+  const staffUsers = users.filter(u => u.role !== UserRole.CUSTOMER && u.role !== 'CUSTOMER');
+  console.log('[TeamView] Total users:', users.length, '| Staff users:', staffUsers.length, '| Users:', users);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -4396,21 +6571,48 @@ const AdminV2: React.FC = () => {
   const refreshData = useCallback(async () => {
     setDataLoading(true);
     try {
-      const [ticketsRes, usersRes, statsRes, notifsRes] = await Promise.all([
-        AdminApi.getTickets({ limit: 100 }),
+      // Use Promise.allSettled to handle individual failures gracefully
+      const [ticketsResult, usersResult, statsResult, notifsResult] = await Promise.allSettled([
+        AdminApi.getTickets({
+          limit: 100,
+          excludeStatus: [TicketStatus.RESOLVED, TicketStatus.CLOSED]
+        }),
         AdminApi.getUsers(),
         AdminApi.getTicketStats(),
         AdminApi.getNotifications(),
       ]);
 
-      setTickets(ticketsRes.data || []);
-      setUsers(usersRes || []);
-      setStats(statsRes);
+      // Handle tickets
+      if (ticketsResult.status === 'fulfilled') {
+        setTickets(ticketsResult.value.data || []);
+      } else {
+        console.error('Erreur chargement tickets:', ticketsResult.reason);
+      }
 
-      // Update seen notification IDs
-      const notifs = notifsRes || [];
-      seenNotifIds.current = new Set(notifs.map((n: NotificationType) => n.id));
-      setNotifications(notifs);
+      // Handle users
+      if (usersResult.status === 'fulfilled') {
+        console.log('[AdminV2] Users loaded:', usersResult.value?.length || 0, usersResult.value);
+        setUsers(usersResult.value || []);
+      } else {
+        console.error('Erreur chargement users:', usersResult.reason);
+      }
+
+      // Handle stats
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value);
+      } else {
+        console.error('Erreur chargement stats:', statsResult.reason);
+      }
+
+      // Handle notifications
+      if (notifsResult.status === 'fulfilled') {
+        const notifs = notifsResult.value || [];
+        seenNotifIds.current = new Set(notifs.map((n: NotificationType) => n.id));
+        setNotifications(notifs);
+      } else {
+        console.error('Erreur chargement notifications:', notifsResult.reason);
+        setNotifications([]);
+      }
     } catch (error) {
       console.error('Erreur chargement données:', error);
     } finally {
@@ -4494,6 +6696,7 @@ const AdminV2: React.FC = () => {
     switch (currentView) {
       case 'dashboard': return <DashboardView />;
       case 'tickets': return <TicketsView />;
+      case 'clients': return <ClientsListView />;
       case 'team': return <TeamView />;
       case 'automation': return <AutomationView />;
       case 'analytics': return <AnalyticsView />;

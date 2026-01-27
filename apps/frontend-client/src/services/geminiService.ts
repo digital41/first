@@ -1,50 +1,29 @@
-import { GoogleGenerativeAI, ChatSession, Content } from '@google/generative-ai';
+// ============================================
+// SERVICE IA CLIENT - Appels API sécurisés vers le backend
+// ============================================
+// Ce service communique avec le backend pour les fonctionnalités IA
+// - Pas de clé API exposée côté client
+// - Les données SAGE sont gérées côté serveur
+// - Sécurité renforcée
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+import api from './api';
 
-// System prompt for Lumo - VERSION FINALE OPTIMISÉE AVEC SAGE
-const SYSTEM_PROMPT = `[IDENTITÉ]
-Je suis Lumo, assistant IA de KLY Groupe (équipements industriels).
-
-[STYLE]
-- Ton: chaleureux, professionnel, empathique
-- Langue: français uniquement
-- Longueur: 2-4 phrases courtes, jamais plus de 80 mots
-- Emojis: 1-2 max par message
-
-[EXPERTISE]
-Je peux aider sur: suivi commandes SAGE, problèmes techniques, création de tickets SAV.
-
-[DONNÉES SAGE]
-J'ai accès aux commandes du client (si fournies dans le contexte).
-Je peux répondre sur: numéros de commande, montants, statuts, dates, articles commandés.
-Si les données SAGE sont dans le contexte, je les utilise pour répondre précisément.
-Si une info n'est pas dans le contexte fourni, je dis honnêtement que je ne l'ai pas.
-
-[COMPORTEMENT]
-1. Je réponds de façon CONCISE et COMPLÈTE
-2. J'utilise les VRAIES données SAGE si disponibles
-3. Je suis HONNÊTE si une info n'est pas disponible
-4. Je termine TOUJOURS mes réponses proprement`;
-
-// Interface pour le contexte SAGE
-interface SageContext {
-  orders?: Array<{
-    orderNumber: string;
-    status: string;
-    totalAmount?: number;
-    orderDate?: string;
-    items?: Array<{
-      productName: string;
-      quantity: number;
-      unitPrice: number;
-    }>;
-  }>;
-  customerName?: string;
-  customerCode?: string;
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
-// Knowledge base for common issues
+interface DiagnosticResult {
+  category: string;
+  issue: string;
+  solutions: string[];
+  needsTicket: boolean;
+  ticketPriority?: string;
+  confidence: number;
+}
+
+// Knowledge base pour réponses rapides côté client (optimisation UX)
 const KNOWLEDGE_BASE = {
   technical: {
     powerIssues: {
@@ -157,74 +136,15 @@ const KNOWLEDGE_BASE = {
   }
 };
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-interface DiagnosticResult {
-  category: string;
-  issue: string;
-  solutions: string[];
-  needsTicket: boolean;
-  ticketPriority?: string;
-  confidence: number;
-}
-
 class GeminiService {
-  private genAI: GoogleGenerativeAI | null = null;
-  private chatSession: ChatSession | null = null;
   private chatHistory: ChatMessage[] = [];
   private isInitialized = false;
 
-  constructor() {
-    if (GEMINI_API_KEY) {
-      this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    }
-  }
-
   async initialize(): Promise<boolean> {
-    if (!this.genAI) {
-      console.warn('Gemini API key not configured');
-      return false;
-    }
-
-    // Try different model names in order of preference (based on Google's official model IDs)
-    // gemini-3-flash-preview = Bleeding edge, gemini-2.5-flash = Stable/Production
-    const modelNames = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-
-    for (const modelName of modelNames) {
-      try {
-        const model = this.genAI.getGenerativeModel({
-          model: modelName,
-        });
-
-        this.chatSession = model.startChat({
-          history: [{
-            role: 'user',
-            parts: [{ text: SYSTEM_PROMPT }]
-          }, {
-            role: 'model',
-            parts: [{ text: 'OK, je suis Lumo. Prêt à aider !' }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 1024,
-            temperature: 0.7,
-          },
-        });
-
-        this.isInitialized = true;
-        console.log(`Gemini initialized with model: ${modelName}`);
-        return true;
-      } catch (error) {
-        console.warn(`Failed to initialize Gemini with model ${modelName}:`, error);
-        continue;
-      }
-    }
-
-    console.error('Failed to initialize Gemini with any model');
-    return false;
+    // Le service est toujours disponible car il utilise le backend
+    this.isInitialized = true;
+    console.log('Client AI Service initialized (using backend API)');
+    return true;
   }
 
   // Analyze user input and find matching issues in knowledge base
@@ -258,82 +178,48 @@ class GeminiService {
     return bestMatch;
   }
 
-  // Generate response using Gemini AI
+  // Generate response using backend API (secure)
   async chat(userMessage: string, context?: {
     orderNumber?: string;
     productName?: string;
     previousIssues?: string[];
-    sageData?: SageContext;
   }): Promise<string> {
-    // First, check knowledge base for quick answers (lowered threshold for better local matching)
+    // First, check knowledge base for quick answers (optimized UX)
     const diagnostic = this.analyzeIssue(userMessage);
 
-    if (diagnostic && diagnostic.confidence > 0.3) {
-      // Match found in knowledge base - return structured response
+    if (diagnostic && diagnostic.confidence > 0.4) {
+      // High confidence match - return structured response immediately
       return this.formatDiagnosticResponse(diagnostic, userMessage);
     }
 
-    // Try Gemini for complex queries (with fallback on failure)
-    if (!this.isInitialized) {
-      const initialized = await this.initialize();
-      if (!initialized) {
-        return this.getSmartFallbackResponse(userMessage);
-      }
-    }
-
-    if (!this.chatSession) {
-      return this.getSmartFallbackResponse(userMessage);
-    }
-
+    // Call backend API for AI response
     try {
-      // Build enhanced message with SAGE context
-      let enhancedMessage = userMessage;
+      const response = await api.post('/client/ai/chat', {
+        message: userMessage,
+        conversationHistory: this.chatHistory.slice(-10).map(m => ({
+          role: m.role,
+          content: m.content
+        })),
+        context
+      });
 
-      // Add SAGE data context if available
-      if (context?.sageData) {
-        const sageInfo: string[] = [];
+      if (response.data.success && response.data.data?.message) {
+        const aiMessage = response.data.data.message;
 
-        if (context.sageData.customerName) {
-          sageInfo.push(`Client: ${context.sageData.customerName}`);
-        }
+        // Store in history
+        this.chatHistory.push(
+          { role: 'user', content: userMessage, timestamp: new Date() },
+          { role: 'assistant', content: aiMessage, timestamp: new Date() }
+        );
 
-        if (context.sageData.orders && context.sageData.orders.length > 0) {
-          sageInfo.push(`\n📦 COMMANDES DU CLIENT (${context.sageData.orders.length} commandes):`);
-          context.sageData.orders.slice(0, 10).forEach((order, i) => {
-            sageInfo.push(`${i + 1}. ${order.orderNumber} - ${order.status} - ${order.totalAmount?.toFixed(2) || '?'}€ - ${order.orderDate || 'date inconnue'}`);
-            if (order.items && order.items.length > 0) {
-              order.items.slice(0, 3).forEach(item => {
-                sageInfo.push(`   • ${item.productName} (x${item.quantity}) - ${item.unitPrice}€`);
-              });
-            }
-          });
-        }
-
-        if (sageInfo.length > 0) {
-          enhancedMessage = `[DONNÉES SAGE RÉELLES]\n${sageInfo.join('\n')}\n\n[QUESTION CLIENT]\n${userMessage}`;
-        }
-      } else if (context?.orderNumber) {
-        enhancedMessage = `[Contexte: Commande ${context.orderNumber}]\n\n${userMessage}`;
+        return aiMessage;
       }
 
-      const result = await this.chatSession.sendMessage(enhancedMessage);
-      const response = result.response.text();
+      // Fallback if API response is invalid
+      return this.getSmartFallbackResponse(userMessage);
 
-      // Store in history
-      this.chatHistory.push(
-        { role: 'user', content: userMessage, timestamp: new Date() },
-        { role: 'assistant', content: response, timestamp: new Date() }
-      );
-
-      return response;
     } catch (error: unknown) {
-      // Handle rate limit errors gracefully
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('429') || errorMessage.includes('quota')) {
-        console.warn('Gemini rate limit reached, using fallback');
-      } else {
-        console.error('Gemini chat error:', error);
-      }
+      console.error('Error calling AI backend:', error);
       return this.getSmartFallbackResponse(userMessage);
     }
   }
@@ -344,12 +230,12 @@ class GeminiService {
 
     // Identity questions
     if (input.includes('qui es-tu') || input.includes('qui êtes-vous') || input.includes('c\'est quoi lumo') || input.includes('tu es qui')) {
-      return "Je suis **Lumo** 🌟, l'agent IA autonome de KLY Groupe !\n\nJe suis là pour vous accompagner sur :\n• 🛒 **Commercial** - Produits, tarifs, disponibilités\n• 📦 **Suivi Sage** - Commandes, livraisons, factures\n• 🔧 **Technique** - Dépannage, codes erreur, maintenance\n\nJe suis proactif, efficace et toujours là pour vous. Qu'est-ce que je peux faire pour vous ?";
+      return "Je suis **Lumo** 🌟, l'agent IA autonome de KLY Groupe !\n\nJe suis là pour vous accompagner sur :\n• 🛒 **Commercial** - Produits, tarifs, disponibilités\n• 📦 **Suivi Sage** - Commandes, livraisons, factures\n• 🔧 **Technique** - Dépannage, codes erreur, maintenance\n• 🌐 **Questions générales** - Équipements industriels, conseils\n\nQu'est-ce que je peux faire pour vous ?";
     }
 
     // Greetings
     if (input.includes('bonjour') || input.includes('salut') || input.includes('hello') || input.includes('bonsoir')) {
-      return "Hey ! 👋 C'est Lumo, votre agent IA KLY Groupe.\n\nJe suis prêt à vous aider sur :\n• 🛒 Questions **commerciales** (produits, prix)\n• 📦 **Suivi Sage** (commandes, livraisons)\n• 🔧 Support **technique** (dépannage, maintenance)\n\nAllez-y, dites-moi ce qui vous amène !";
+      return "Hey ! 👋 C'est Lumo, votre agent IA KLY Groupe.\n\nJe suis prêt à vous aider sur :\n• 🛒 Questions **commerciales** (produits, prix)\n• 📦 **Suivi Sage** (commandes, livraisons)\n• 🔧 Support **technique** (dépannage, maintenance)\n• 🌐 **Questions générales** sur l'industrie\n\nAllez-y, dites-moi ce qui vous amène !";
     }
 
     // Thanks
@@ -393,7 +279,7 @@ class GeminiService {
     }
 
     // Default helpful response - Lumo style
-    return "Hmm, laissez-moi reformuler pour bien vous aider ! 🤔\n\n**Mes domaines d'expertise :**\n• 🛒 **Commercial** - Produits, tarifs, disponibilités\n• 📦 **Suivi Sage** - Commandes, livraisons, factures\n• 🔧 **Technique** - Dépannage, codes erreur, maintenance\n\nPouvez-vous me donner plus de détails sur votre demande ?\n\n💡 Sinon, on peut toujours créer un **ticket** et un humain prendra le relais !";
+    return "Hmm, laissez-moi reformuler pour bien vous aider ! 🤔\n\n**Mes domaines d'expertise :**\n• 🛒 **Commercial** - Produits, tarifs, disponibilités\n• 📦 **Suivi Sage** - Commandes, livraisons, factures\n• 🔧 **Technique** - Dépannage, codes erreur, maintenance\n• 🌐 **Questions générales** - Équipements industriels, conseils\n\nPouvez-vous me donner plus de détails sur votre demande ?";
   }
 
   private formatDiagnosticResponse(diagnostic: DiagnosticResult, originalQuery: string): string {
@@ -419,25 +305,6 @@ class GeminiService {
     }
 
     return response;
-  }
-
-  private getFallbackResponse(userMessage: string): string {
-    const input = userMessage.toLowerCase();
-
-    // Simple keyword matching for offline mode - Lumo persona
-    if (input.includes('bonjour') || input.includes('salut') || input.includes('hello')) {
-      return "Hey ! 👋 C'est Lumo. Comment puis-je vous aider ?";
-    }
-
-    if (input.includes('merci')) {
-      return "Avec plaisir ! 😊 Je reste dispo si besoin !";
-    }
-
-    if (input.includes('ticket') || input.includes('agent') || input.includes('humain')) {
-      return "Pas de souci ! Créez un ticket et un de nos experts vous contactera rapidement. 🎯";
-    }
-
-    return "Je suis Lumo ! 🌟 Donnez-moi plus de détails et je vais vous aider. Sinon, on peut créer un ticket ensemble !";
   }
 
   // Get suggestions based on user input
@@ -469,9 +336,10 @@ class GeminiService {
   // Clear chat history
   clearHistory(): void {
     this.chatHistory = [];
-    if (this.genAI && this.isInitialized) {
-      this.initialize(); // Restart session
-    }
+    // Also reset backend session
+    api.post('/client/ai/reset').catch(() => {
+      // Ignore errors - session will be recreated on next chat
+    });
   }
 
   // Get chat history
@@ -479,12 +347,57 @@ class GeminiService {
     return [...this.chatHistory];
   }
 
-  // Check if service is available
+  // Check if service is available - always true since we use backend
   isAvailable(): boolean {
-    return !!GEMINI_API_KEY;
+    return true;
+  }
+
+  // Create a ticket from the conversation
+  async createTicket(): Promise<{
+    success: boolean;
+    ticketNumber?: string;
+    contextualResponse?: string;
+    error?: string
+  }> {
+    try {
+      if (this.chatHistory.length < 2) {
+        return {
+          success: false,
+          error: 'La conversation est trop courte pour créer un ticket'
+        };
+      }
+
+      const response = await api.post('/client/ai/create-ticket', {
+        conversationHistory: this.chatHistory.map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+      });
+
+      if (response.data.success && response.data.data) {
+        return {
+          success: true,
+          ticketNumber: response.data.data.ticketNumber,
+          // Réponse contextuelle générée par l'IA
+          contextualResponse: response.data.data.contextualResponse
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data.error || 'Impossible de créer le ticket'
+      };
+
+    } catch (error: unknown) {
+      console.error('Error creating ticket:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la création du ticket'
+      };
+    }
   }
 }
 
 export const geminiService = new GeminiService();
 export default geminiService;
-export type { ChatMessage, DiagnosticResult, SageContext };
+export type { ChatMessage, DiagnosticResult };

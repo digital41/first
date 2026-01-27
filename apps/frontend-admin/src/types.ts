@@ -191,6 +191,8 @@ export interface Notification {
   userId?: string;
   type: NotificationType;
   ticketId?: string;
+  ticketNumber?: number; // Numéro de ticket lisible
+  ticketTitle?: string; // Titre du ticket
   messageId?: string;
   payload?: Record<string, unknown>;
   // For real-time notifications
@@ -208,6 +210,7 @@ export interface TicketFilters {
   page?: number;
   limit?: number;
   status?: TicketStatus;
+  excludeStatus?: TicketStatus[];
   issueType?: IssueType;
   priority?: TicketPriority;
   assignedToId?: string;

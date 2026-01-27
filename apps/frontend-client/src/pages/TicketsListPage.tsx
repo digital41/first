@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search,
-  Filter,
   PlusCircle,
   ChevronDown,
   Ticket,
   Clock,
-  ArrowUpDown,
   Bell
 } from 'lucide-react';
 import { ticketsApi } from '@/services/api';
@@ -22,13 +20,30 @@ export function TicketsListPage() {
   const [meta, setMeta] = useState<PaginatedResponse<TicketType>['meta'] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState<string | false>(false);
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
   const { getUnreadCountForTicket } = useNotificationContext();
+
+  // Refs pour la détection des clics extérieurs
+  const filterContainerRef = useRef<HTMLDivElement>(null);
 
   // Get filters from URL
   const statusFilter = searchParams.get('status') as TicketStatus | null;
   const priorityFilter = searchParams.get('priority') as TicketPriority | null;
   const issueTypeFilter = searchParams.get('issueType') as IssueType | null;
+
+  // Fermer le dropdown quand on clique à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterContainerRef.current && !filterContainerRef.current.contains(event.target as Node)) {
+        setOpenFilter(null);
+      }
+    };
+
+    if (openFilter) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [openFilter]);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -64,6 +79,7 @@ export function TicketsListPage() {
       newParams.delete(key);
     }
     setSearchParams(newParams);
+    setOpenFilter(null); // Fermer le dropdown après sélection
   };
 
   const clearFilters = () => {
@@ -73,60 +89,65 @@ export function TicketsListPage() {
 
   const hasActiveFilters = statusFilter || priorityFilter || issueTypeFilter || search;
 
+  // Composant FilterDropdown simplifié
   const FilterDropdown = ({
+    id,
     label,
     value,
     options,
     onChange,
   }: {
+    id: string;
     label: string;
     value: string | null;
     options: { value: string; label: string }[];
     onChange: (value: string | null) => void;
-  }) => (
-    <div className="relative">
-      <button
-        onClick={() => setShowFilters(showFilters === label ? false : label)}
-        className={cn(
-          'flex items-center px-3 py-2 border rounded-lg text-sm transition-colors',
-          value
-            ? 'border-primary-500 bg-primary-50 text-primary-700'
-            : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-        )}
-      >
-        {value ? options.find((o) => o.value === value)?.label : label}
-        <ChevronDown size={16} className="ml-2" />
-      </button>
-      {showFilters === label && (
-        <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-          <button
-            onClick={() => {
-              onChange(null);
-              setShowFilters(false);
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-600 hover:bg-gray-50"
-          >
-            Tous
-          </button>
-          {options.map((option) => (
+  }) => {
+    const isOpen = openFilter === id;
+
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpenFilter(isOpen ? null : id)}
+          className={cn(
+            'flex items-center px-3 py-2 border rounded-lg text-sm transition-colors cursor-pointer',
+            value
+              ? 'border-primary-500 bg-primary-50 text-primary-700'
+              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+          )}
+        >
+          {value ? options.find((o) => o.value === value)?.label : label}
+          <ChevronDown size={16} className={cn('ml-2 transition-transform', isOpen && 'rotate-180')} />
+        </button>
+
+        {isOpen && (
+          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[100]">
             <button
-              key={option.value}
-              onClick={() => {
-                onChange(option.value);
-                setShowFilters(false);
-              }}
-              className={cn(
-                'w-full px-4 py-2 text-left text-sm hover:bg-gray-50',
-                value === option.value ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
-              )}
+              type="button"
+              onClick={() => onChange(null)}
+              className="w-full px-4 py-2 text-left text-sm text-gray-600 hover:bg-gray-50"
             >
-              {option.label}
+              Tous
             </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+            {options.map((option) => (
+              <button
+                type="button"
+                key={option.value}
+                onClick={() => onChange(option.value)}
+                className={cn(
+                  'w-full px-4 py-2 text-left text-sm hover:bg-gray-50',
+                  value === option.value ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 fade-in">
@@ -145,7 +166,7 @@ export function TicketsListPage() {
       </div>
 
       {/* Filters bar */}
-      <div className="card p-4">
+      <div className="card p-4 overflow-visible">
         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
           {/* Search */}
           <div className="relative flex-1">
@@ -160,8 +181,9 @@ export function TicketsListPage() {
           </div>
 
           {/* Filter dropdowns */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div ref={filterContainerRef} className="flex items-center gap-2 flex-wrap">
             <FilterDropdown
+              id="status"
               label="Statut"
               value={statusFilter}
               options={[
@@ -174,6 +196,7 @@ export function TicketsListPage() {
               onChange={(value) => updateFilter('status', value)}
             />
             <FilterDropdown
+              id="priority"
               label="Priorité"
               value={priorityFilter}
               options={[
@@ -185,6 +208,7 @@ export function TicketsListPage() {
               onChange={(value) => updateFilter('priority', value)}
             />
             <FilterDropdown
+              id="issueType"
               label="Type"
               value={issueTypeFilter}
               options={[
@@ -342,11 +366,6 @@ export function TicketsListPage() {
             </button>
           </div>
         </div>
-      )}
-
-      {/* Click outside handler for filters */}
-      {showFilters && (
-        <div className="fixed inset-0 z-0" onClick={() => setShowFilters(false)} />
       )}
     </div>
   );

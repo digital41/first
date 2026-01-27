@@ -138,3 +138,27 @@ export async function deleteUser(
     next(error);
   }
 }
+
+/**
+ * GET /api/admin/clients
+ * Liste les clients ayant ouvert des tickets SAV
+ */
+export async function getClientsWithTickets(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { search, page, limit } = req.query;
+
+    const result = await userService.getClientsWithTickets({
+      search: search as string | undefined,
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
+
+    sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+}

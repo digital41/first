@@ -95,19 +95,52 @@ export function TicketDetailPage() {
 
     const handleNewMessage = (message: unknown) => {
       console.log('[TicketDetail] Received message:new event:', message);
-      const msg = message as TicketMessage & { offerHumanHelp?: boolean; isAI?: boolean };
-      if (!msg.isInternal) {
-        // Éviter les doublons - vérifier si le message existe déjà
+      // Le message WebSocket a une structure différente du type TicketMessage
+      const wsMsg = message as {
+        id: string;
+        authorId?: string;
+        authorName?: string;
+        content: string;
+        isInternal: boolean;
+        createdAt: string;
+        attachments?: Array<{ id: string; fileName: string; url: string; mimeType?: string }>;
+        isAI?: boolean;
+        offerHumanHelp?: boolean;
+      };
+
+      if (!wsMsg.isInternal) {
+        // Transformer le message WebSocket en TicketMessage
+        const normalizedMsg: TicketMessage = {
+          id: wsMsg.id,
+          ticketId: id || '',
+          authorId: wsMsg.authorId || '',
+          content: wsMsg.content || '',
+          isInternal: wsMsg.isInternal,
+          isRead: false,
+          createdAt: wsMsg.createdAt,
+          updatedAt: wsMsg.createdAt,
+          attachments: wsMsg.attachments?.map(a => ({
+            id: a.id,
+            fileName: a.fileName,
+            url: a.url,
+            mimeType: a.mimeType,
+          })),
+          isAI: wsMsg.isAI,
+          authorName: wsMsg.authorName,
+        };
+
+        // Éviter les doublons
         setMessages((prev) => {
-          const exists = prev.some((m) => m.id === msg.id);
+          const exists = prev.some((m) => m.id === normalizedMsg.id);
           if (exists) {
-            console.log('[TicketDetail] Message already exists, skipping:', msg.id);
+            console.log('[TicketDetail] Message already exists, skipping:', normalizedMsg.id);
             return prev;
           }
-          return [...prev, msg];
+          return [...prev, normalizedMsg];
         });
+
         // Afficher le bouton "Parler à un humain" si l'IA le propose
-        if (msg.isAI && msg.offerHumanHelp) {
+        if (wsMsg.isAI && wsMsg.offerHumanHelp) {
           setShowHumanHelpButton(true);
         }
       }
@@ -428,9 +461,9 @@ export function TicketDetailPage() {
             {/* Messages */}
             {messages.map((message) => {
               const isOwnMessage = message.authorId === user?.id;
-              const isAIMessage = message.author?.displayName?.includes('IA') ||
-                                  message.authorName?.includes('IA') ||
-                                  (message as unknown as { isAI?: boolean }).isAI;
+              const isAIMessage = message.isAI ||
+                                  message.author?.displayName?.includes('IA') ||
+                                  message.authorName?.includes('IA');
               return (
                 <div
                   key={message.id}

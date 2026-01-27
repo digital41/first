@@ -41,12 +41,15 @@ export function formatMessageTime(date: string | Date): string {
 }
 
 // File size formatting
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
+export function formatFileSize(bytes: number | undefined | null): string {
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '-';
 
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  // Protection contre les index hors limites
+  if (i < 0 || i >= sizes.length) return '-';
 
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }

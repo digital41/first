@@ -68,6 +68,7 @@ export async function list(
       sortBy,
       sortOrder,
       status,
+      excludeStatus,
       issueType,
       priority,
       assignedToId,
@@ -84,12 +85,19 @@ export async function list(
       effectiveAssignedToId = req.user.id;
     }
 
+    // Parser excludeStatus (peut être une string séparée par des virgules)
+    let parsedExcludeStatus: TicketStatus[] | undefined;
+    if (excludeStatus) {
+      parsedExcludeStatus = (excludeStatus as string).split(',') as TicketStatus[];
+    }
+
     const result = await ticketService.listTickets({
       page: parseInt(page as string, 10),
       limit: parseInt(limit as string, 10),
       sortBy: sortBy as string,
       sortOrder: sortOrder as 'asc' | 'desc',
       status: status as TicketStatus,
+      excludeStatus: parsedExcludeStatus,
       issueType: issueType as IssueType,
       priority: priority as TicketPriority,
       assignedToId: effectiveAssignedToId,
@@ -168,6 +176,106 @@ export async function myStats(
     const statistics = await ticketService.getClientTicketStats(customerId);
 
     sendSuccess(res, statistics);
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ============================================
+// TRANSFERT DE TICKETS
+// ============================================
+
+/**
+ * POST /api/admin/tickets/:id/transfer
+ * Demande un transfert de ticket vers un autre agent
+ */
+export async function requestTransfer(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const ticketId = req.params.id as string;
+    const { toAgentId, reason } = req.body;
+
+    if (!toAgentId) {
+      res.status(400).json({ success: false, error: 'Agent cible requis' });
+      return;
+    }
+
+    const transfer = await ticketService.requestTicketTransfer(
+      ticketId,
+      req.user.id,
+      toAgentId,
+      reason
+    );
+
+    sendSuccess(res, transfer, 'Demande de transfert envoyée');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/admin/transfers/:transferId/accept
+ * Accepte un transfert de ticket
+ */
+export async function acceptTransfer(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { transferId } = req.params;
+
+    const ticket = await ticketService.acceptTicketTransfer(
+      transferId as string,
+      req.user.id
+    );
+
+    sendSuccess(res, ticket, 'Transfert accepté');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/admin/transfers/:transferId/decline
+ * Refuse un transfert de ticket
+ */
+export async function declineTransfer(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { transferId } = req.params;
+    const { reason } = req.body;
+
+    await ticketService.declineTicketTransfer(
+      transferId as string,
+      req.user.id,
+      reason
+    );
+
+    sendSuccess(res, null, 'Transfert refusé');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/admin/transfers/pending
+ * Récupère les transferts en attente pour l'agent connecté
+ */
+export async function getPendingTransfers(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const transfers = ticketService.getPendingTransfersForAgent(req.user.id);
+    sendSuccess(res, transfers);
   } catch (error) {
     next(error);
   }

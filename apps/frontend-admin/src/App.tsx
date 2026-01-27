@@ -154,87 +154,116 @@ const UsersPage: React.FC = () => {
 const VersionSelector: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+
+      <div className="max-w-4xl w-full relative">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4">KLY GROUPE - SAV Admin</h1>
-          <p className="text-slate-300 text-lg">Choisissez la version de l'interface</p>
+          <div className="inline-flex items-center gap-3 mb-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <h1 className="text-4xl font-bold text-white flex items-center gap-2">
+                SAV Pro
+                <span className="px-2 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-sm font-bold rounded-full">V2</span>
+              </h1>
+              <p className="text-slate-400 text-sm">KLY Groupe - Administration</p>
+            </div>
+          </div>
+          <p className="text-slate-300 text-lg">Choisissez votre espace de travail</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Version 1 - Originale */}
+          {/* SAV Pro V2 - Principal (recommandé) */}
           <Link
             to="/admin"
-            className="group bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105"
+            className="group relative bg-gradient-to-br from-indigo-500/20 to-purple-500/20 backdrop-blur-sm border-2 border-indigo-400/40 rounded-2xl p-8 hover:from-indigo-500/30 hover:to-purple-500/30 transition-all duration-300 hover:scale-[1.02] hover:border-indigo-400/60 shadow-xl"
           >
-            <div className="w-16 h-16 bg-indigo-500 rounded-xl flex items-center justify-center mb-6 group-hover:bg-indigo-400 transition-colors">
-              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+            <div className="absolute top-4 right-4">
+              <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">RECOMMANDÉ</span>
             </div>
-            <h2 className="text-2xl font-semibold text-white mb-3">Version 1 - Standard</h2>
-            <p className="text-slate-300 mb-4">Interface originale avec gestion de tickets et utilisateurs.</p>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/30">
+                <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">SAV Pro V2</h2>
+            <p className="text-slate-300 mb-4">Interface moderne pour la gestion complète du SAV.</p>
             <ul className="text-sm text-slate-400 space-y-2">
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
-                Dashboard tickets
+                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Dashboard tickets optimisé
               </li>
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
-                Gestion utilisateurs
+                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Assistant IA intégré
               </li>
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
-                Messagerie tickets
+                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Gestion utilisateurs avancée
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Intégration SAGE 100
               </li>
             </ul>
-            <div className="mt-6 flex items-center text-indigo-400 font-medium">
-              Accéder à V1
+            <div className="mt-6 flex items-center text-white font-medium bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-2 rounded-lg w-fit group-hover:shadow-lg group-hover:shadow-indigo-500/30 transition-all">
+              Accéder à SAV Pro V2
               <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
             </div>
           </Link>
 
-          {/* Version 2 - SAV Industriel */}
+          {/* Version SAV Industriel */}
           <Link
             to="/v2"
-            className="group bg-gradient-to-br from-indigo-500/20 to-purple-500/20 backdrop-blur-sm border border-indigo-400/30 rounded-2xl p-8 hover:from-indigo-500/30 hover:to-purple-500/30 transition-all duration-300 hover:scale-105"
+            className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02]"
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center group-hover:from-indigo-400 group-hover:to-purple-400 transition-colors">
-                <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <span className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-semibold rounded-full">NOUVEAU</span>
+            <div className="w-16 h-16 bg-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-slate-600 transition-colors">
+              <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
             </div>
-            <h2 className="text-2xl font-semibold text-white mb-3">Version 2 - SAV Industriel</h2>
-            <p className="text-slate-300 mb-4">Interface complète pour la gestion SAV industrielle professionnelle.</p>
-            <ul className="text-sm text-slate-400 space-y-2">
+            <h2 className="text-2xl font-semibold text-white mb-3">SAV Industriel</h2>
+            <p className="text-slate-400 mb-4">Version spécialisée pour la maintenance industrielle.</p>
+            <ul className="text-sm text-slate-500 space-y-2">
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
                 Gestion équipements & machines
               </li>
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
                 Interventions terrain & planning
               </li>
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
                 Stock pièces détachées
               </li>
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
                 Contrats de maintenance
               </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
-                Analytics & Satisfaction client
-              </li>
             </ul>
-            <div className="mt-6 flex items-center text-purple-400 font-medium">
-              Découvrir V2
+            <div className="mt-6 flex items-center text-slate-400 font-medium">
+              Accéder au SAV Industriel
               <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
@@ -242,9 +271,11 @@ const VersionSelector: React.FC = () => {
           </Link>
         </div>
 
-        <p className="text-center text-slate-500 mt-8 text-sm">
-          Les deux versions fonctionnent indépendamment avec le même backend.
-        </p>
+        <div className="text-center mt-10">
+          <p className="text-slate-500 text-sm">
+            Version 2.0.0 • KLY Groupe © 2024
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -145,15 +145,22 @@ const AdminSidebar: React.FC = () => {
       }`}
     >
       {/* Header avec logo */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700 bg-gradient-to-r from-slate-900 to-slate-800">
         {!isCollapsed && (
           <div className="flex items-center space-x-2">
-            <Shield className="w-6 h-6 text-indigo-400" />
-            <span className="font-bold text-lg">KLY Admin</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-lg text-white">SAV Pro</span>
+              <span className="px-1.5 py-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-[10px] font-bold text-white rounded">V2</span>
+            </div>
           </div>
         )}
         {isCollapsed && (
-          <Shield className="w-6 h-6 text-indigo-400 mx-auto" />
+          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center mx-auto">
+            <Shield className="w-5 h-5 text-white" />
+          </div>
         )}
       </div>
 
@@ -178,7 +185,7 @@ const AdminSidebar: React.FC = () => {
                     className={({ isActive }) =>
                       `flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                         isActive
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30'
                           : item.highlight
                           ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 hover:text-white'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -223,14 +230,14 @@ const AdminSidebar: React.FC = () => {
       {!isCollapsed && user && (
         <div className="p-4 border-t border-slate-700">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-sm font-medium">
+            <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-sm font-semibold shadow-lg">
               {user.displayName?.charAt(0) || '?'}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">
                 {user.displayName}
               </p>
-              <p className="text-xs text-slate-400 truncate">{user.role}</p>
+              <p className="text-xs text-slate-400 truncate capitalize">{user.role?.toLowerCase()}</p>
             </div>
           </div>
         </div>

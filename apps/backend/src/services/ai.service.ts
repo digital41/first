@@ -33,6 +33,22 @@ interface TicketContext {
   customerName?: string | null;
   companyName?: string | null;
   contactEmail?: string | null;
+  contactPhone?: string | null;
+  // Informations équipement (si renseignées)
+  serialNumber?: string | null;
+  equipmentModel?: string | null;
+  equipmentBrand?: string | null;
+  errorCode?: string | null;
+  // Informations commande liée (si applicable)
+  orderInfo?: {
+    orderNumber: string;
+    orderDate?: string;
+    products?: Array<{
+      reference: string;
+      designation: string;
+      quantity: number;
+    }>;
+  } | null;
   conversationHistory: Array<{
     role: 'customer' | 'agent' | 'ai';
     content: string;
@@ -58,67 +74,111 @@ interface ExtractedEquipmentInfo {
   errorCode?: string;
 }
 
-// Prompt système pour l'IA SAV - LUMO
-const SYSTEM_PROMPT = `Tu es LUMO, l'assistant intelligent du service après-vente de KLY GROUPE, leader français dans la distribution d'équipements industriels et professionnels.
+// ============================================
+// PROMPT SYSTÈME POUR L'ASSISTANT IA KLY (TICKETS)
+// ============================================
+// Note: Cet agent est DIFFÉRENT de LUMO (widget chat client)
+// - Assistant IA KLY = professionnel, formel, répond dans les tickets
+// - LUMO = conversationnel, décontracté, widget chat client (client-ai.service.ts)
 
-🎯 TA MISSION:
-Tu es le premier point de contact des clients. Ton objectif est de résoudre rapidement leurs problèmes ou de collecter les informations nécessaires pour qu'un technicien puisse intervenir efficacement.
+const SYSTEM_PROMPT = `Tu es l'Assistant IA du Service Après-Vente de KLY GROUPE, leader français de la distribution d'équipements industriels et professionnels.
 
-👤 TA PERSONNALITÉ:
-- Professionnel mais chaleureux et accessible
-- Empathique : tu comprends la frustration d'un client avec un équipement en panne
-- Proactif : tu anticipes les besoins et proposes des solutions
-- Rassurant : tu montres que le problème sera pris en charge
+IDENTITÉ ET MISSION
+Tu es le premier point de contact intelligent pour les demandes SAV. Ta mission est de garantir une expérience client exceptionnelle en :
+- Répondant rapidement et efficacement aux demandes
+- Résolvant les problèmes de premier niveau sans intervention humaine
+- Collectant les informations essentielles pour les cas complexes
+- Rassurant le client et l'accompagnant jusqu'à la résolution
 
-📋 RÈGLES DE CONVERSATION:
-1. Réponds TOUJOURS en français, avec un ton naturel et humain
-2. Sois CONCIS : 2-4 phrases maximum (80-120 mots)
-3. JAMAIS de markdown, balises HTML ou formatage spécial
-4. UNE seule question par message pour ne pas submerger le client
-5. Utilise le prénom du client quand disponible
-6. Termine toujours par une question ou une action claire
+VALEURS DE SERVICE
+- Excellence : Chaque interaction doit refléter le professionnalisme de KLY GROUPE
+- Empathie : Comprendre la situation du client et reconnaître l'impact sur son activité
+- Efficacité : Aller droit au but, proposer des solutions concrètes
+- Transparence : Être honnête sur les délais et les limites de ton intervention
 
-🔧 STRATÉGIES PAR TYPE DE PROBLÈME:
+EXPERTISE TECHNIQUE
+Tu maîtrises les domaines suivants :
+- Équipements de chauffage (pompes à chaleur, chaudières, radiateurs)
+- Climatisation et traitement de l'air
+- Plomberie et sanitaire
+- Outillage professionnel
+- Électroportatif et accessoires
 
-TECHNIQUE (TECHNICAL):
-- Demande le modèle de l'équipement et le numéro de série
-- Demande le code erreur affiché (si applicable)
-- Propose des solutions de dépannage simples (redémarrage, vérifications basiques)
-- Si le problème persiste après 2 échanges, propose l'intervention d'un technicien
+DONNÉES CONTEXTUELLES À TA DISPOSITION
+Pour chaque ticket, tu reçois automatiquement :
+- Informations client : nom du contact, entreprise, email
+- Détails du ticket : titre (problème décrit), description complète, type de demande, priorité
+- Historique complet de la conversation
+- Commande associée (si liée) : numéro BC/BL, produits commandés, dates
 
-LIVRAISON (DELIVERY):
-- Demande le numéro de commande (format BC-XXXXX)
-- Vérifie l'adresse de livraison si pertinent
-- Rassure sur le suivi et donne des délais réalistes
+COMMENT EXPLOITER CES DONNÉES :
+1. PERSONNALISE chaque réponse avec le prénom/nom du client (ex: "Bonjour M. Dupont")
+2. REFORMULE le problème décrit dans le titre pour montrer que tu as compris
+3. Si une COMMANDE est liée, mentionne son numéro (BC-XXXXX) et les produits concernés
+4. Adapte l'URGENCE de ton ton selon la priorité (plus réactif et direct pour URGENT/HIGH)
+5. NE REDEMANDE JAMAIS une information déjà présente dans le contexte ou l'historique
+6. Utilise les détails produits/équipements mentionnés pour des réponses techniques précises
 
-FACTURATION (BILLING):
-- Demande le numéro de facture concerné
-- Identifie précisément le problème (montant, erreur, avoir demandé)
-- Oriente vers le service comptabilité si nécessaire
+GESTION DES DEMANDES
 
-AUTRE (OTHER):
-- Identifie d'abord le vrai besoin du client
-- Redirige vers la bonne catégorie si possible
+PROBLÈMES TECHNIQUES (TECHNICAL) :
+1. Accuser réception et montrer de l'empathie pour l'impact sur l'activité du client
+2. Demander le modèle exact et le numéro de série de l'équipement
+3. Identifier le symptôme précis (code erreur, comportement anormal, bruit, etc.)
+4. Proposer un diagnostic de premier niveau si applicable :
+   - Vérifications basiques (alimentation, connexions, réglages)
+   - Procédures de réinitialisation standard
+   - Points de contrôle visuels
+5. Si le problème persiste, préparer l'escalade vers un technicien
 
-🚨 ESCALADE VERS UN HUMAIN:
-Propose de transférer à un technicien/agent si:
-- Le problème est urgent ou critique (machine à l'arrêt, perte de production)
-- Le client est frustré ou mécontent après 2 échanges
-- Tu n'as pas de solution technique à proposer
-- Le client le demande explicitement
+PROBLÈMES DE LIVRAISON (DELIVERY) :
+1. Demander le numéro de commande (format BC-XXXXX ou numéro de facture)
+2. Vérifier le statut de livraison si les informations sont disponibles
+3. Pour les retards : s'excuser, expliquer la situation, donner un délai réaliste
+4. Pour les colis endommagés : demander des photos, lancer la procédure de réclamation
+5. Pour les erreurs de livraison : noter les détails, proposer une solution
 
-💬 EXEMPLES DE FORMULATIONS:
-- "Je comprends que cette situation soit frustrante..."
-- "Pas de souci, je vais vous aider à résoudre cela."
-- "Pour mieux vous aider, pourriez-vous me préciser..."
-- "Je transfère votre dossier à notre équipe technique qui vous contactera rapidement."
+PROBLÈMES DE FACTURATION (BILLING) :
+1. Demander le numéro de facture concerné
+2. Identifier précisément le problème : montant incorrect, article manquant, avoir attendu
+3. Vérifier les informations du compte client
+4. Pour les remises non appliquées : demander les références de l'accord commercial
+5. Orienter vers le service comptabilité si nécessaire avec un résumé clair
 
-⚠️ À ÉVITER ABSOLUMENT:
-- Les réponses robotiques ou impersonnelles
-- Les listes à puces ou numérotées
-- Les phrases trop longues ou techniques
-- Promettre des délais que tu ne peux pas garantir
-- Répéter les mêmes questions`;
+AUTRES DEMANDES (OTHER) :
+1. Identifier le vrai besoin du client par des questions ouvertes
+2. Qualifier la demande pour la rediriger vers le bon service
+3. Si hors périmètre SAV : orienter vers le service commercial ou technique approprié
+
+STYLE DE COMMUNICATION
+- Langue : Français exclusivement
+- Ton : Professionnel, courtois, rassurant
+- Structure : Salutation personnalisée, reconnaissance du problème, action/question, conclusion
+- Éviter : Jargon technique excessif, promesses non tenables, réponses génériques
+
+⚠️ RÈGLE ABSOLUE - CONCISION EXTRÊME
+- MAXIMUM 2-3 phrases COURTES (40-60 mots GRAND MAXIMUM)
+- Format STRICT : "Bonjour [Nom], [1 phrase problème]. [1 question précise]."
+- JAMAIS de paragraphes multiples
+- JAMAIS de "En attendant", "Afin de", "Je reste à votre disposition"
+- UNE SEULE question à la fois, pas de questions multiples
+- Exemple parfait : "Bonjour M. Dupont, je prends en charge votre demande concernant le produit défectueux. Pouvez-vous me communiquer le numéro de série ?"
+
+ESCALADE VERS UN AGENT HUMAIN
+Transférer immédiatement si :
+- Le client demande explicitement un humain
+- Le problème nécessite une intervention sur site
+- Le client est mécontent après 2-3 échanges
+- La situation implique un risque (sécurité, perte financière importante)
+- Tu ne disposes pas des informations nécessaires pour aider
+
+FORMAT DE RÉPONSE OBLIGATOIRE
+- Salutation courte + 1 phrase problème + 1 question = FIN
+- PAS de "Je reste à votre disposition", "N'hésitez pas", etc.
+- PAS de paragraphes multiples
+- PAS de markdown ou formatage
+
+RAPPEL FINAL: Ta réponse doit faire 2-3 phrases MAXIMUM. Si tu écris plus, tu échoues.`;
 
 export const AIService = {
   /**
@@ -140,8 +200,8 @@ export const AIService = {
         model: GEMINI_MODEL,
         safetySettings,
         generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 500,
+          temperature: 0.3, // Très basse pour suivre les instructions strictement
+          maxOutputTokens: 2000,
         },
       });
 
@@ -188,11 +248,39 @@ Type: ${this.getIssueTypeLabel(context.issueType)}
 Priorité: ${this.getPriorityLabel(context.priority)}
 Statut: ${context.status}
 
-Client: ${context.customerName || context.companyName || 'Client'}
-${context.contactEmail ? `Email: ${context.contactEmail}` : ''}
+CLIENT:
+- Nom: ${context.customerName || 'Non renseigné'}
+- Entreprise: ${context.companyName || 'Non renseignée'}
+${context.contactEmail ? `- Email: ${context.contactEmail}` : ''}
+${context.contactPhone ? `- Téléphone: ${context.contactPhone}` : ''}
 
 SUJET: ${context.title}
-${context.description ? `\nDESCRIPTION:\n${context.description}` : ''}`;
+${context.description ? `\nDESCRIPTION DU PROBLÈME:\n${context.description}` : ''}`;
+
+    // Ajouter les informations équipement si disponibles
+    if (context.serialNumber || context.equipmentModel || context.equipmentBrand || context.errorCode) {
+      prompt += '\n\nÉQUIPEMENT CONCERNÉ:';
+      if (context.equipmentBrand) prompt += `\n- Marque: ${context.equipmentBrand}`;
+      if (context.equipmentModel) prompt += `\n- Modèle: ${context.equipmentModel}`;
+      if (context.serialNumber) prompt += `\n- N° série: ${context.serialNumber}`;
+      if (context.errorCode) prompt += `\n- Code erreur: ${context.errorCode}`;
+    }
+
+    // Ajouter les informations commande si liée
+    if (context.orderInfo) {
+      prompt += `\n\nCOMMANDE ASSOCIÉE:`;
+      prompt += `\n- Numéro: ${context.orderInfo.orderNumber}`;
+      if (context.orderInfo.orderDate) prompt += `\n- Date: ${context.orderInfo.orderDate}`;
+      if (context.orderInfo.products && context.orderInfo.products.length > 0) {
+        prompt += '\n- Produits:';
+        context.orderInfo.products.slice(0, 5).forEach(p => {
+          prompt += `\n  • ${p.designation} (Réf: ${p.reference}) x${p.quantity}`;
+        });
+        if (context.orderInfo.products.length > 5) {
+          prompt += `\n  ... et ${context.orderInfo.products.length - 5} autre(s) produit(s)`;
+        }
+      }
+    }
 
     if (context.conversationHistory.length > 0) {
       prompt += '\n\nHISTORIQUE DE LA CONVERSATION:';
@@ -202,7 +290,7 @@ ${context.description ? `\nDESCRIPTION:\n${context.description}` : ''}`;
       }
     }
 
-    prompt += '\n\nGénère une réponse appropriée pour le client.';
+    prompt += '\n\nGénère une réponse appropriée et personnalisée pour le client en utilisant les informations ci-dessus.';
 
     return prompt;
   },
@@ -361,6 +449,13 @@ ${context.description ? `\nDESCRIPTION:\n${context.description}` : ''}`;
         where: { id: ticketId },
         include: {
           customer: true,
+          order: {
+            include: {
+              lines: {
+                take: 10, // Limiter aux 10 premiers produits
+              },
+            },
+          },
           messages: {
             orderBy: { createdAt: 'asc' },
             include: { author: true },
@@ -377,6 +472,20 @@ ${context.description ? `\nDESCRIPTION:\n${context.description}` : ''}`;
         timestamp: m.createdAt.toISOString(),
       }));
 
+      // Construire les infos de commande si disponibles
+      let orderInfo: TicketContext['orderInfo'] = null;
+      if (ticket.order) {
+        orderInfo = {
+          orderNumber: ticket.order.orderNumber,
+          orderDate: ticket.order.orderDate?.toLocaleDateString('fr-FR'),
+          products: ticket.order.lines?.map(line => ({
+            reference: line.productCode || 'N/A',
+            designation: line.productName || 'Produit',
+            quantity: Number(line.quantity) || 1,
+          })),
+        };
+      }
+
       return {
         ticketId: ticket.id,
         ticketNumber: ticket.ticketNumber,
@@ -388,6 +497,14 @@ ${context.description ? `\nDESCRIPTION:\n${context.description}` : ''}`;
         customerName: ticket.contactName || ticket.customer?.displayName,
         companyName: ticket.companyName,
         contactEmail: ticket.contactEmail || ticket.customer?.email,
+        contactPhone: ticket.contactPhone,
+        // Informations équipement
+        serialNumber: ticket.serialNumber,
+        equipmentModel: ticket.equipmentModel,
+        equipmentBrand: ticket.equipmentBrand,
+        errorCode: ticket.errorCode,
+        // Informations commande
+        orderInfo,
         conversationHistory,
       };
     } catch (error) {
@@ -580,7 +697,7 @@ ${context.description ? `\nDESCRIPTION:\n${context.description}` : ''}`;
         safetySettings,
         generationConfig: {
           temperature: 0.5,
-          maxOutputTokens: 1000,
+          maxOutputTokens: 2000,
         },
       });
 
@@ -861,7 +978,7 @@ ${context.description ? `\nDESCRIPTION INITIALE:\n${context.description}` : ''}`
         safetySettings,
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 800,
+          maxOutputTokens: 2000,
         },
       });
 
@@ -1265,7 +1382,7 @@ export const GlobalAIAssistant = {
         safetySettings,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 500,
+          maxOutputTokens: 2000,
         },
       });
 
@@ -1518,6 +1635,181 @@ export const GlobalAIAssistant = {
       })),
       unassignedCount,
     };
+  },
+};
+
+// ============================================
+// AUTOBOT STATISTICS SERVICE
+// ============================================
+
+export interface AutoBotStats {
+  ticketsHandled: number;
+  ticketsResolved: number;
+  avgResponseTime: string;
+  satisfactionRate: number;
+  currentlyActive: number;
+}
+
+export interface AIConversation {
+  id: string;
+  ticketId: string;
+  ticketNumber: number;
+  ticketTitle: string;
+  status: 'resolved' | 'escalated' | 'active';
+  messages: number;
+  resolvedWithoutHuman: boolean;
+  lastActivity: string;
+}
+
+export const AutoBotService = {
+  /**
+   * Récupère les statistiques de l'AI AutoBot
+   */
+  async getStats(): Promise<AutoBotStats> {
+    try {
+      // Trouver l'utilisateur IA
+      const aiUser = await prisma.user.findFirst({
+        where: { email: 'ai-assistant@kly-groupe.com' },
+      });
+
+      if (!aiUser) {
+        return {
+          ticketsHandled: 0,
+          ticketsResolved: 0,
+          avgResponseTime: '< 1 min',
+          satisfactionRate: 0,
+          currentlyActive: 0,
+        };
+      }
+
+      // Tickets où l'IA a envoyé au moins un message
+      const ticketsWithAIMessages = await prisma.chatMessage.groupBy({
+        by: ['ticketId'],
+        where: { authorId: aiUser.id },
+        _count: { id: true },
+      });
+
+      const ticketIdsWithAI = ticketsWithAIMessages.map(t => t.ticketId);
+      const ticketsHandled = ticketIdsWithAI.length;
+
+      // Tickets résolus où l'IA était impliquée
+      const resolvedTicketsWithAI = await prisma.ticket.count({
+        where: {
+          id: { in: ticketIdsWithAI },
+          status: { in: ['RESOLVED', 'CLOSED'] },
+        },
+      });
+
+      // Tickets actifs avec messages IA (conversations en cours)
+      const activeTicketsWithAI = await prisma.ticket.count({
+        where: {
+          id: { in: ticketIdsWithAI },
+          status: { notIn: ['RESOLVED', 'CLOSED'] },
+        },
+      });
+
+      // Calculer un taux de résolution (tickets résolus / tickets traités)
+      const satisfactionRate = ticketsHandled > 0
+        ? Math.round((resolvedTicketsWithAI / ticketsHandled) * 100)
+        : 0;
+
+      return {
+        ticketsHandled,
+        ticketsResolved: resolvedTicketsWithAI,
+        avgResponseTime: '< 1 min', // L'IA répond instantanément
+        satisfactionRate: Math.min(satisfactionRate, 100),
+        currentlyActive: activeTicketsWithAI,
+      };
+    } catch (error) {
+      console.error('Erreur récupération stats AutoBot:', error);
+      return {
+        ticketsHandled: 0,
+        ticketsResolved: 0,
+        avgResponseTime: '< 1 min',
+        satisfactionRate: 0,
+        currentlyActive: 0,
+      };
+    }
+  },
+
+  /**
+   * Récupère les conversations IA récentes
+   */
+  async getRecentConversations(limit = 10): Promise<AIConversation[]> {
+    try {
+      // Trouver l'utilisateur IA
+      const aiUser = await prisma.user.findFirst({
+        where: { email: 'ai-assistant@kly-groupe.com' },
+      });
+
+      if (!aiUser) {
+        return [];
+      }
+
+      // Récupérer les tickets avec des messages IA, ordonnés par dernier message
+      const ticketsWithAI = await prisma.ticket.findMany({
+        where: {
+          messages: {
+            some: { authorId: aiUser.id },
+          },
+        },
+        select: {
+          id: true,
+          ticketNumber: true,
+          title: true,
+          status: true,
+          updatedAt: true,
+          messages: {
+            select: {
+              authorId: true,
+              author: {
+                select: { role: true, email: true },
+              },
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+      });
+
+      return ticketsWithAI.map(ticket => {
+        // Compter les messages de l'IA
+        const aiMessages = ticket.messages.filter(m => m.authorId === aiUser.id);
+        const aiMessageCount = aiMessages.length;
+
+        // Vérifier si des agents humains ont répondu
+        const humanAgentMessages = ticket.messages.filter(
+          m => m.author?.role !== 'CUSTOMER' && m.authorId !== aiUser.id
+        );
+        const hasHumanIntervention = humanAgentMessages.length > 0;
+
+        // Déterminer le statut
+        let status: 'resolved' | 'escalated' | 'active';
+        if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+          status = 'resolved';
+        } else if (hasHumanIntervention) {
+          status = 'escalated';
+        } else {
+          status = 'active';
+        }
+
+        return {
+          id: ticket.id,
+          ticketId: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          ticketTitle: ticket.title,
+          status,
+          messages: aiMessageCount,
+          resolvedWithoutHuman: status === 'resolved' && !hasHumanIntervention,
+          lastActivity: ticket.updatedAt.toISOString(),
+        };
+      });
+    } catch (error) {
+      console.error('Erreur récupération conversations IA:', error);
+      return [];
+    }
   },
 };
 

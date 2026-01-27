@@ -152,10 +152,12 @@ export interface TicketMessage {
   ticketId: string;
   authorId: string;
   author?: User;
+  authorName?: string; // Utilisé par WebSocket
   content: string;
   isInternal: boolean;
   isRead: boolean;
   attachments?: Attachment[];
+  isAI?: boolean; // Indique si c'est un message IA
   createdAt: string;
   updatedAt: string;
 }
@@ -165,13 +167,13 @@ export interface Attachment {
   id: string;
   url: string;
   fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  context: 'TICKET' | 'MESSAGE';
+  mimeType?: string;
+  sizeBytes?: number;
+  context?: 'TICKET' | 'MESSAGE';
   ticketId?: string;
   messageId?: string;
   uploadedById?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 // Ticket History

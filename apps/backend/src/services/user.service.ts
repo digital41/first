@@ -350,3 +350,108 @@ export async function getAgentStats(agentId: string) {
     avgSatisfaction: avgResolutionTime._avg.satisfactionScore || null,
   };
 }
+
+/**
+ * Liste les clients ayant ouvert des tickets SAV
+ * Avec leurs statistiques (nombre de tickets, dernier ticket, etc.)
+ */
+export interface ClientFilters {
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export async function getClientsWithTickets(filters: ClientFilters = {}) {
+  const { search, page = 1, limit = 20 } = filters;
+  const skip = (page - 1) * limit;
+
+  // Construire le where clause
+  const where: Prisma.UserWhereInput = {
+    role: 'CUSTOMER',
+    tickets: {
+      some: {}, // Au moins un ticket créé
+    },
+  };
+
+  if (search) {
+    where.OR = [
+      { email: { contains: search, mode: 'insensitive' } },
+      { displayName: { contains: search, mode: 'insensitive' } },
+      { phone: { contains: search } },
+    ];
+  }
+
+  const [clients, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        displayName: true,
+        createdAt: true,
+        lastSeenAt: true,
+        isActive: true,
+        tickets: {
+          select: {
+            id: true,
+            ticketNumber: true,
+            title: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5, // Derniers 5 tickets seulement
+        },
+        _count: {
+          select: {
+            tickets: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  // Enrichir les données avec des statistiques
+  const enrichedClients = clients.map(client => {
+    const openTickets = client.tickets.filter(t => !['CLOSED', 'RESOLVED'].includes(t.status)).length;
+    const lastTicket = client.tickets[0] || null;
+
+    return {
+      id: client.id,
+      email: client.email,
+      phone: client.phone,
+      displayName: client.displayName,
+      createdAt: client.createdAt,
+      lastSeenAt: client.lastSeenAt,
+      isActive: client.isActive,
+      totalTickets: client._count.tickets,
+      openTickets,
+      lastTicket: lastTicket ? {
+        id: lastTicket.id,
+        ticketNumber: lastTicket.ticketNumber,
+        title: lastTicket.title,
+        status: lastTicket.status,
+        priority: lastTicket.priority,
+        createdAt: lastTicket.createdAt,
+      } : null,
+      recentTickets: client.tickets,
+    };
+  });
+
+  return {
+    clients: enrichedClients,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}

@@ -47,6 +47,22 @@ router.get('/tickets/:id', ticketController.getOne as unknown as RequestHandler)
 router.put('/tickets/:id', ticketController.update as unknown as RequestHandler);
 
 // ============================================
+// TRANSFERT DE TICKETS
+// ============================================
+
+// Demander un transfert de ticket
+router.post('/tickets/:id/transfer', ticketController.requestTransfer as unknown as RequestHandler);
+
+// Accepter un transfert
+router.post('/transfers/:transferId/accept', ticketController.acceptTransfer as unknown as RequestHandler);
+
+// Refuser un transfert
+router.post('/transfers/:transferId/decline', ticketController.declineTransfer as unknown as RequestHandler);
+
+// Voir les transferts en attente
+router.get('/transfers/pending', ticketController.getPendingTransfers as unknown as RequestHandler);
+
+// ============================================
 // MESSAGES ADMIN
 // ============================================
 
@@ -83,6 +99,13 @@ router.put('/users/:id', adminOnly, userController.updateUser as unknown as Requ
 
 // Supprimer un utilisateur
 router.delete('/users/:id', adminOnly, userController.deleteUser as unknown as RequestHandler);
+
+// ============================================
+// CLIENTS SAV
+// ============================================
+
+// Liste des clients ayant ouvert des tickets
+router.get('/clients', userController.getClientsWithTickets as unknown as RequestHandler);
 
 // ============================================
 // NOTIFICATIONS
@@ -139,6 +162,9 @@ router.post('/upload', upload.array('files', 5), uploadController.uploadFiles as
 
 // Obtenir une suggestion IA pour un ticket
 router.post('/ai/suggest/:ticketId', aiController.getAISuggestion as unknown as RequestHandler);
+
+// Suggestion IA avec streaming (plus rapide)
+router.post('/ai/suggest-stream/:ticketId', aiController.getAISuggestionStream as unknown as RequestHandler);
 
 // Analyser rapidement un ticket
 router.post('/ai/analyze/:ticketId', aiController.analyzeTicket as unknown as RequestHandler);

@@ -23,6 +23,20 @@ export async function createNotification(
   const { userId, type, ticketId, messageId, payload } = params;
 
   try {
+    // Récupérer le numéro de ticket si ticketId est fourni
+    let ticketNumber: number | undefined;
+    let ticketTitle: string | undefined;
+    if (ticketId) {
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        select: { ticketNumber: true, title: true },
+      });
+      if (ticket) {
+        ticketNumber = ticket.ticketNumber;
+        ticketTitle = ticket.title;
+      }
+    }
+
     // Créer en base de données
     const notification = await prisma.notification.create({
       data: {
@@ -30,7 +44,11 @@ export async function createNotification(
         type,
         ticketId,
         messageId,
-        payload: payload ? JSON.parse(JSON.stringify(payload)) : undefined,
+        payload: payload ? JSON.parse(JSON.stringify({
+          ...payload,
+          ticketNumber, // Inclure le numéro de ticket dans le payload
+          ticketTitle: ticketTitle || payload?.ticketTitle,
+        })) : undefined,
       },
     });
 
@@ -38,13 +56,15 @@ export async function createNotification(
     const title = (payload?.title as string) || type;
     const body = (payload?.content as string) || '';
 
-    // Envoyer via WebSocket
+    // Envoyer via WebSocket avec le numéro de ticket
     sendNotificationToUser(userId, {
       id: notification.id,
       type: notification.type,
       title,
       body,
       ticketId: notification.ticketId ?? undefined,
+      ticketNumber, // Ajouter le numéro de ticket
+      ticketTitle: ticketTitle || (payload?.ticketTitle as string),
       createdAt: notification.createdAt.toISOString(),
     });
   } catch (error) {

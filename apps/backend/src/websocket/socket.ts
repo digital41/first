@@ -202,8 +202,11 @@ export function broadcastNewMessage(
   }
 ): void {
   if (!io) return;
-  console.log(`[Socket] Broadcasting message:new to room ticket:${ticketId}`, message.id);
-  io.to(`ticket:${ticketId}`).emit('message:new', message);
+  const room = `ticket:${ticketId}`;
+  const roomSockets = io.sockets.adapter.rooms.get(room);
+  const clientCount = roomSockets ? roomSockets.size : 0;
+  console.log(`[Socket] Broadcasting message:new to room ${room} (${clientCount} clients)`, message.id);
+  io.to(room).emit('message:new', message);
 }
 
 /**

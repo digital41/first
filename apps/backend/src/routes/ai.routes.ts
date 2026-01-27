@@ -3,7 +3,7 @@
 // ============================================
 
 import { Router, Request, Response, NextFunction, RequestHandler } from 'express';
-import { AIService } from '../services/ai.service.js';
+import { AIService, AutoBotService } from '../services/ai.service.js';
 import { authenticate, requireStaff } from '../middlewares/auth.middleware.js';
 import { z } from 'zod';
 
@@ -182,6 +182,41 @@ router.post('/analyze', requireStaff as unknown as RequestHandler, (async (req: 
         confidence: response.confidence,
         suggestedActions: response.suggestedActions,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+}) as RequestHandler);
+
+// ============================================
+// GET /ai/autobot/stats - Statistiques de l'AI AutoBot
+// ============================================
+
+router.get('/autobot/stats', requireStaff as unknown as RequestHandler, (async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const stats = await AutoBotService.getStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+}) as RequestHandler);
+
+// ============================================
+// GET /ai/autobot/conversations - Conversations IA récentes
+// ============================================
+
+router.get('/autobot/conversations', requireStaff as unknown as RequestHandler, (async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const conversations = await AutoBotService.getRecentConversations(limit);
+
+    res.json({
+      success: true,
+      data: conversations,
     });
   } catch (error) {
     next(error);

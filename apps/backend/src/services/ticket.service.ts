@@ -15,6 +15,78 @@ import { broadcastAITyping, broadcastNewMessage } from '../websocket/index.js';
 // ============================================
 
 /**
+ * Trouve l'agent le moins chargé pour auto-assignation
+ * Utilise l'algorithme du moins de tickets actifs (load balancing)
+ */
+async function findBestAvailableAgent(): Promise<string | null> {
+  // Récupérer tous les agents et superviseurs actifs
+  const agents = await prisma.user.findMany({
+    where: {
+      role: { in: ['AGENT', 'SUPERVISOR'] },
+      isActive: true,
+    },
+    select: {
+      id: true,
+      displayName: true,
+      _count: {
+        select: {
+          assignedTickets: {
+            where: {
+              status: { notIn: ['RESOLVED', 'CLOSED'] },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (agents.length === 0) return null;
+
+  // Trier par nombre de tickets actifs (le moins chargé en premier)
+  agents.sort((a, b) => a._count.assignedTickets - b._count.assignedTickets);
+
+  // Retourner l'agent le moins chargé
+  return agents[0].id;
+}
+
+/**
+ * Auto-assigne un ticket à un agent disponible
+ */
+export async function autoAssignTicket(ticketId: string): Promise<{ agentId: string; agentName: string } | null> {
+  const agentId = await findBestAvailableAgent();
+  if (!agentId) return null;
+
+  const agent = await prisma.user.findUnique({
+    where: { id: agentId },
+    select: { id: true, displayName: true },
+  });
+
+  if (!agent) return null;
+
+  // Mettre à jour le ticket avec l'assignation
+  await prisma.ticket.update({
+    where: { id: ticketId },
+    data: {
+      assignedToId: agentId,
+      status: 'IN_PROGRESS',
+    },
+  });
+
+  // Enregistrer dans l'historique
+  await prisma.ticketHistory.create({
+    data: {
+      ticketId,
+      action: 'AUTO_ASSIGNED',
+      field: 'assignedToId',
+      oldValue: null,
+      newValue: agentId,
+    },
+  });
+
+  return { agentId: agent.id, agentName: agent.displayName };
+}
+
+/**
  * Crée un nouveau ticket SAV
  */
 export async function createTicket(
@@ -103,6 +175,22 @@ export async function createTicket(
         priority: ticket.priority,
       },
     });
+  }
+
+  // ============================================
+  // AUTO-ASSIGNATION AUTOMATIQUE
+  // ============================================
+  // Assigner automatiquement le ticket à l'agent le moins chargé
+  const assignResult = await autoAssignTicket(ticket.id);
+  if (assignResult) {
+    console.log(`[Auto-Assign] Ticket #${ticket.ticketNumber} assigné à ${assignResult.agentName}`);
+
+    // Notifier l'agent de la nouvelle assignation
+    await notifyTicketAssigned(ticket.id, assignResult.agentId, ticket.title);
+
+    // Mettre à jour le ticket retourné avec les nouvelles infos
+    ticket.assignedToId = assignResult.agentId;
+    ticket.status = 'IN_PROGRESS';
   }
 
   // ============================================
@@ -240,6 +328,7 @@ export async function getTicket(id: string): Promise<Ticket | null> {
 export async function listTickets(
   params: PaginationParams & {
     status?: TicketStatus;
+    excludeStatus?: TicketStatus[];
     issueType?: IssueType;
     priority?: TicketPriority;
     assignedToId?: string;
@@ -253,6 +342,7 @@ export async function listTickets(
     sortBy = 'createdAt',
     sortOrder = 'desc',
     status,
+    excludeStatus,
     issueType,
     priority,
     assignedToId,
@@ -263,15 +353,17 @@ export async function listTickets(
   const where: Record<string, unknown> = {};
 
   // Filtrage par statut
-  // Si un statut est spécifié, on filtre par ce statut
-  // Sinon, pour les clients on exclut RESOLVED/CLOSED, pour les admins on montre tout
   if (status) {
+    // Si un statut spécifique est demandé
     where.status = status;
+  } else if (excludeStatus && excludeStatus.length > 0) {
+    // Si des statuts sont à exclure
+    where.status = { notIn: excludeStatus };
   } else if (customerId) {
     // Pour les clients: exclure les tickets résolus/fermés par défaut
     where.status = { notIn: ['RESOLVED', 'CLOSED'] };
   }
-  // Pour les admins/agents: pas de filtre par défaut, on montre tous les tickets
+  // Pour les admins/agents sans filtre: on montre tous les tickets
 
   if (issueType) where.issueType = issueType;
   if (priority) where.priority = priority;
@@ -290,7 +382,7 @@ export async function listTickets(
       where,
       include: {
         customer: {
-          select: { id: true, displayName: true, email: true },
+          select: { id: true, displayName: true, email: true, phone: true },
         },
         assignedTo: {
           select: { id: true, displayName: true },
@@ -527,6 +619,207 @@ export async function getClientTicketStats(customerId: string): Promise<{
     closed: statusCounts['CLOSED'] || 0,
     slaBreached: slaBreachedCount,
   };
+}
+
+// ============================================
+// SYSTÈME DE TRANSFERT DE TICKETS
+// ============================================
+
+interface TransferRequest {
+  id: string;
+  ticketId: string;
+  ticketNumber: number;
+  ticketTitle: string;
+  fromAgentId: string;
+  fromAgentName: string;
+  toAgentId: string;
+  reason?: string;
+  createdAt: string;
+}
+
+// Stockage en mémoire des demandes de transfert (en production, utiliser Redis ou DB)
+const pendingTransfers = new Map<string, TransferRequest>();
+
+/**
+ * Demande un transfert de ticket vers un autre agent
+ */
+export async function requestTicketTransfer(
+  ticketId: string,
+  fromAgentId: string,
+  toAgentId: string,
+  reason?: string
+): Promise<TransferRequest> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: {
+      id: true,
+      ticketNumber: true,
+      title: true,
+      assignedToId: true,
+    },
+  });
+
+  if (!ticket) {
+    throw AppError.notFound('Ticket non trouvé');
+  }
+
+  if (ticket.assignedToId !== fromAgentId) {
+    throw AppError.forbidden('Vous ne pouvez transférer que vos propres tickets');
+  }
+
+  const [fromAgent, toAgent] = await Promise.all([
+    prisma.user.findUnique({ where: { id: fromAgentId }, select: { displayName: true } }),
+    prisma.user.findUnique({ where: { id: toAgentId }, select: { displayName: true, isActive: true } }),
+  ]);
+
+  if (!toAgent || !toAgent.isActive) {
+    throw AppError.badRequest('Agent cible invalide ou inactif');
+  }
+
+  const transferId = `transfer_${ticketId}_${Date.now()}`;
+  const transferRequest: TransferRequest = {
+    id: transferId,
+    ticketId,
+    ticketNumber: ticket.ticketNumber,
+    ticketTitle: ticket.title,
+    fromAgentId,
+    fromAgentName: fromAgent?.displayName || 'Agent',
+    toAgentId,
+    reason,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Stocker la demande
+  pendingTransfers.set(transferId, transferRequest);
+
+  // Notifier l'agent cible
+  await createNotification({
+    userId: toAgentId,
+    type: 'TICKET_UPDATE',
+    ticketId,
+    payload: {
+      action: 'transfer_request',
+      title: 'Demande de transfert',
+      content: `${fromAgent?.displayName || 'Un agent'} souhaite vous transférer le ticket "${ticket.title}".`,
+      transferId,
+      fromAgentId,
+      fromAgentName: fromAgent?.displayName,
+      reason,
+    },
+  });
+
+  return transferRequest;
+}
+
+/**
+ * Accepte un transfert de ticket
+ */
+export async function acceptTicketTransfer(
+  transferId: string,
+  acceptingAgentId: string
+): Promise<Ticket> {
+  const transfer = pendingTransfers.get(transferId);
+
+  if (!transfer) {
+    throw AppError.notFound('Demande de transfert non trouvée ou expirée');
+  }
+
+  if (transfer.toAgentId !== acceptingAgentId) {
+    throw AppError.forbidden('Vous n\'êtes pas le destinataire de ce transfert');
+  }
+
+  // Effectuer le transfert
+  const ticket = await prisma.ticket.update({
+    where: { id: transfer.ticketId },
+    data: { assignedToId: acceptingAgentId },
+  });
+
+  // Enregistrer dans l'historique
+  await prisma.ticketHistory.create({
+    data: {
+      ticketId: transfer.ticketId,
+      actorId: acceptingAgentId,
+      action: 'TRANSFER_ACCEPTED',
+      field: 'assignedToId',
+      oldValue: transfer.fromAgentId,
+      newValue: acceptingAgentId,
+    },
+  });
+
+  // Notifier l'agent d'origine
+  const acceptingAgent = await prisma.user.findUnique({
+    where: { id: acceptingAgentId },
+    select: { displayName: true },
+  });
+
+  await createNotification({
+    userId: transfer.fromAgentId,
+    type: 'TICKET_UPDATE',
+    ticketId: transfer.ticketId,
+    payload: {
+      action: 'transfer_accepted',
+      title: 'Transfert accepté',
+      content: `${acceptingAgent?.displayName} a accepté le transfert du ticket "${transfer.ticketTitle}".`,
+    },
+  });
+
+  // Supprimer la demande
+  pendingTransfers.delete(transferId);
+
+  return ticket;
+}
+
+/**
+ * Refuse un transfert de ticket
+ */
+export async function declineTicketTransfer(
+  transferId: string,
+  decliningAgentId: string,
+  declineReason?: string
+): Promise<void> {
+  const transfer = pendingTransfers.get(transferId);
+
+  if (!transfer) {
+    throw AppError.notFound('Demande de transfert non trouvée ou expirée');
+  }
+
+  if (transfer.toAgentId !== decliningAgentId) {
+    throw AppError.forbidden('Vous n\'êtes pas le destinataire de ce transfert');
+  }
+
+  // Notifier l'agent d'origine
+  const decliningAgent = await prisma.user.findUnique({
+    where: { id: decliningAgentId },
+    select: { displayName: true },
+  });
+
+  await createNotification({
+    userId: transfer.fromAgentId,
+    type: 'TICKET_UPDATE',
+    ticketId: transfer.ticketId,
+    payload: {
+      action: 'transfer_declined',
+      title: 'Transfert refusé',
+      content: `${decliningAgent?.displayName} a refusé le transfert du ticket "${transfer.ticketTitle}".${declineReason ? ` Raison: ${declineReason}` : ''}`,
+      declineReason,
+    },
+  });
+
+  // Supprimer la demande
+  pendingTransfers.delete(transferId);
+}
+
+/**
+ * Récupère les demandes de transfert en attente pour un agent
+ */
+export function getPendingTransfersForAgent(agentId: string): TransferRequest[] {
+  const transfers: TransferRequest[] = [];
+  pendingTransfers.forEach(transfer => {
+    if (transfer.toAgentId === agentId) {
+      transfers.push(transfer);
+    }
+  });
+  return transfers;
 }
 
 /**

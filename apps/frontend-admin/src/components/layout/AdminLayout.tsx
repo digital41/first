@@ -80,10 +80,15 @@ const AdminLayout: React.FC = () => {
                 )}
               </button>
 
-              {/* Page title - could be dynamic */}
-              <h1 className="text-lg font-semibold text-slate-800 hidden sm:block">
-                Espace Administration
-              </h1>
+              {/* Page title with version badge */}
+              <div className="hidden sm:flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-slate-800">
+                  SAV Pro
+                </h1>
+                <span className="px-1.5 py-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-[10px] font-bold text-white rounded">
+                  V2
+                </span>
+              </div>
             </div>
 
             {/* Right section */}
@@ -148,7 +153,7 @@ const AdminLayout: React.FC = () => {
                   }}
                   className="flex items-center space-x-2 p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 >
-                  <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm">
                     {user?.displayName?.charAt(0) || '?'}
                   </div>
                   <span className="hidden sm:block text-sm font-medium text-slate-700">
@@ -165,8 +170,8 @@ const AdminLayout: React.FC = () => {
                         {user?.displayName}
                       </p>
                       <p className="text-xs text-slate-500">{user?.email}</p>
-                      <span className="mt-1 inline-block px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded">
-                        {user?.role}
+                      <span className="mt-1 inline-block px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 rounded capitalize">
+                        {user?.role?.toLowerCase()}
                       </span>
                     </div>
                     <div className="py-1">

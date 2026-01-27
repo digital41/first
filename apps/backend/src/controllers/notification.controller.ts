@@ -44,9 +44,16 @@ export async function getNotifications(
       getUnreadCount(userId),
     ]);
 
+    // Enrichir les notifications avec ticketNumber et ticketTitle depuis le payload
+    const enrichedNotifications = notifications.map(n => ({
+      ...n,
+      ticketNumber: (n.payload as Record<string, unknown>)?.ticketNumber,
+      ticketTitle: (n.payload as Record<string, unknown>)?.ticketTitle,
+    }));
+
     res.json({
       success: true,
-      data: notifications,
+      data: enrichedNotifications,
       meta: {
         page: pageNum,
         limit: limitNum,
