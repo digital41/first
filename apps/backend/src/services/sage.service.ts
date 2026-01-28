@@ -236,6 +236,49 @@ export const SageService = {
   },
 
   /**
+   * Recherche un client par son email dans SAGE
+   * Utilisé pour lier automatiquement un compte Google au compte client SAGE
+   */
+  async searchCustomerByEmail(email: string): Promise<SageCustomer[] | null> {
+    if (!email) return null;
+
+    try {
+      const pool = await getSqlPool();
+      if (!pool || !mssql) return null;
+
+      const result = await pool
+        .request()
+        .input('email', mssql.NVarChar, email.toLowerCase())
+        .query(`
+          SELECT TOP 5
+            CT_Num as customerCode,
+            CT_Intitule as companyName,
+            CT_Contact as contactName,
+            CT_EMail as email,
+            CT_Telephone as phone,
+            CT_Telecopie as fax,
+            CT_Adresse as address,
+            CT_Complement as addressComplement,
+            CT_CodePostal as postalCode,
+            CT_Ville as city,
+            CT_Pays as country,
+            CT_Siret as siret,
+            CT_Identifiant as tvaIntra
+          FROM ${SAGE_TABLES.COMPTET} WITH (NOLOCK)
+          WHERE LOWER(CT_EMail) = @email
+            AND CT_Type = 0
+        `);
+
+      if (result.recordset.length === 0) return null;
+
+      return result.recordset as SageCustomer[];
+    } catch (error) {
+      console.error('[SAGE] Erreur searchCustomerByEmail:', error instanceof Error ? error.message : 'Erreur');
+      return null;
+    }
+  },
+
+  /**
    * Récupère les commandes d'un client avec pagination SQL
    * Retourne tableau vide si erreur (jamais d'exception)
    * @param customerCode - Code client SAGE

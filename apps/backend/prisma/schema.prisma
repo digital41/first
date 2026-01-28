@@ -87,7 +87,9 @@ model User {
   role        UserRole @default(CUSTOMER)
   isActive    Boolean  @default(true)
 
-  passwordHash String?
+  passwordHash       String?
+  mustChangePassword Boolean  @default(false)  // Force changement mdp a la prochaine connexion
+  avatarUrl          String?  // URL de l'avatar (Google, etc.)
 
   // SAGE 100 - Code client (pour les customers)
   customerCode String?  @unique  // Code compte client SAGE (ex: COCO001)
@@ -116,9 +118,49 @@ model User {
   // Automation rules created by this user
   automationRulesCreated AutomationRule[] @relation("AutomationCreator")
 
+  // Social accounts (Google, Microsoft, etc.)
+  socialAccounts SocialAccount[]
+
   @@index([email])
   @@index([role])
   @@index([customerCode])
+}
+
+// ============================================
+// MODEL: SOCIAL ACCOUNT (OAuth providers)
+// ============================================
+
+enum OAuthProvider {
+  GOOGLE
+  MICROSOFT
+  APPLE
+}
+
+model SocialAccount {
+  id              String        @id @default(cuid())
+  provider        OAuthProvider
+  providerUserId  String        // ID unique du provider (Google sub, etc.)
+
+  // Infos du provider
+  email           String?
+  name            String?
+  avatarUrl       String?
+
+  // Tokens (optionnel, pour refresh)
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
+
+  // Relation utilisateur
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([provider, email])
 }
 
 // ============================================
@@ -479,4 +521,26 @@ model AutomationExecution {
   @@index([ticketId])
   @@index([executedAt])
   @@index([ruleId, executedAt])
+}
+
+// ============================================
+// MODEL: BRAND (Marques pour fiches techniques)
+// ============================================
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String   @unique  // Nom de la marque (ex: Bosch, Siemens)
+  slug        String   @unique  // URL-friendly (ex: bosch, siemens)
+  description String?           // Description optionnelle
+  logoUrl     String?           // URL du logo de la marque
+  folderUrl   String?           // Lien vers le dossier SharePoint/Drive
+  websiteUrl  String?           // Site web officiel de la marque
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([order])
 }

@@ -283,7 +283,7 @@ export function ProfilePage() {
                 <span className="text-purple-600 font-bold text-sm">#</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Code client SAGE</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Code client</p>
                 <p className="font-medium text-gray-900 font-mono">{user.customerCode}</p>
               </div>
             </div>

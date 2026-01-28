@@ -12,6 +12,7 @@ import {
   CannedResponse,
   Attachment,
   AutomationRule,
+  Brand,
 } from '../types';
 
 // ============================================
@@ -655,7 +656,7 @@ export const AdminApi = {
       }>('/sage/status');
       return response;
     } catch {
-      return { enabled: false, available: false, message: 'Erreur connexion SAGE' };
+      return { enabled: false, available: false, message: 'Erreur de connexion' };
     }
   },
 
@@ -1168,6 +1169,80 @@ export const AdminApi = {
     if (options?.offset) params.set('offset', options.offset.toString());
     const query = params.toString() ? `?${params.toString()}` : '';
     return fetchWithAuth(`/admin/automation/history${query}`);
+  },
+
+  // ==========================================
+  // MARQUES (Base de connaissances)
+  // ==========================================
+
+  /**
+   * Récupère toutes les marques (admin - inclut les inactives)
+   */
+  async getBrands(): Promise<Brand[]> {
+    return fetchWithAuth<Brand[]>('/admin/brands');
+  },
+
+  /**
+   * Récupère une marque par son ID
+   */
+  async getBrandById(id: string): Promise<Brand> {
+    return fetchWithAuth<Brand>(`/brands/${id}`);
+  },
+
+  /**
+   * Crée une nouvelle marque
+   */
+  async createBrand(data: {
+    name: string;
+    description?: string;
+    logoUrl?: string;
+    folderUrl?: string;
+    websiteUrl?: string;
+    isActive?: boolean;
+  }): Promise<Brand> {
+    return fetchWithAuth<Brand>('/admin/brands', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Met à jour une marque
+   */
+  async updateBrand(
+    id: string,
+    data: Partial<{
+      name: string;
+      description: string;
+      logoUrl: string;
+      folderUrl: string;
+      websiteUrl: string;
+      isActive: boolean;
+    }>
+  ): Promise<Brand> {
+    return fetchWithAuth<Brand>(`/admin/brands/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Supprime une marque
+   */
+  async deleteBrand(id: string): Promise<void> {
+    await fetchWithAuth<void>(`/admin/brands/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Réordonne les marques
+   */
+  async reorderBrands(brandIds: string[]): Promise<void> {
+    await fetchWithAuth<void>('/admin/brands/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ brandIds }),
+    });
   },
 };
 

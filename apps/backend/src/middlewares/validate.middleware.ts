@@ -82,7 +82,7 @@ export const loginByReferenceSchema = z
   })
   .refine(
     (data) => data.orderNumber || data.blNumber || data.faNumber,
-    { message: 'Au moins une référence SAGE (BC, BL ou FA) est requise' }
+    { message: 'Au moins une référence (BC, BL ou FA) est requise' }
   );
 
 // Authentification admin
@@ -124,4 +124,26 @@ export const updateTicketSchema = z.object({
 // Refresh token
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token requis'),
+});
+
+// OAuth Google
+export const googleOAuthSchema = z.object({
+  idToken: z.string().min(1, 'Token Google requis'),
+});
+
+// OAuth provider param
+export const oauthProviderSchema = z.object({
+  provider: z.enum(['GOOGLE', 'MICROSOFT', 'APPLE']),
+});
+
+// Email + Password login
+export const emailLoginSchema = z.object({
+  email: z.string().email('Email invalide'),
+  password: z.string().min(1, 'Mot de passe requis'),
+});
+
+// Change password
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caracteres'),
 });

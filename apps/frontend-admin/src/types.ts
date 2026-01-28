@@ -313,3 +313,21 @@ export interface AutomationStats {
   autoAssignCount: number;
   notificationCount: number;
 }
+
+// ============================================
+// INTERFACES - Base de connaissances (Marques)
+// ============================================
+
+export interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  folderUrl?: string;    // Lien vers le dossier externe (SharePoint/Drive)
+  websiteUrl?: string;
+  order: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

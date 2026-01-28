@@ -1,0 +1,162 @@
+# ============================================
+# DOCKER COMPOSE - Production KLY SAV
+# ============================================
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # ============================================
+  # BASE DE DONNÉES POSTGRESQL
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: kly-sav-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-kly_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-kly_sav}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kly_user} -d ${DB_NAME:-kly_sav}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kly-network
+
+  # ============================================
+  # REDIS (Sessions, Cache)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: kly-sav-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kly-network
+
+  # ============================================
+  # BACKEND API (Node.js)
+  # ============================================
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: kly-sav-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-kly_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-kly_sav}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      EMAIL_FROM: ${EMAIL_FROM}
+      SAGE_API_URL: ${SAGE_API_URL}
+      SAGE_API_KEY: ${SAGE_API_KEY}
+    volumes:
+      - uploads_data:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kly-network
+
+  # ============================================
+  # FRONTEND ADMIN (React)
+  # ============================================
+  frontend-admin:
+    build:
+      context: ./apps/frontend-admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_ADMIN_API_URL}
+        VITE_WS_URL: ${VITE_ADMIN_WS_URL}
+    container_name: kly-sav-admin
+    restart: always
+    networks:
+      - kly-network
+
+  # ============================================
+  # FRONTEND CLIENT (React)
+  # ============================================
+  frontend-client:
+    build:
+      context: ./apps/frontend-client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_CLIENT_API_URL}
+        VITE_WS_URL: ${VITE_CLIENT_WS_URL}
+    container_name: kly-sav-client
+    restart: always
+    networks:
+      - kly-network
+
+  # ============================================
+  # NGINX REVERSE PROXY
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: kly-sav-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend-admin
+      - frontend-client
+    networks:
+      - kly-network
+
+  # ============================================
+  # CERTBOT (SSL Let's Encrypt)
+  # ============================================
+  certbot:
+    image: certbot/certbot
+    container_name: kly-sav-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  kly-network:
+    driver: bridge

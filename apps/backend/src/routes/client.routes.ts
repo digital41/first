@@ -5,6 +5,7 @@ import * as orderController from '../controllers/order.controller.js';
 import * as messageController from '../controllers/message.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as uploadController from '../controllers/upload.controller.js';
+import * as brandController from '../controllers/brand.controller.js';
 import { upload } from '../config/multer.js';
 import { ClientAIService } from '../services/client-ai.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
@@ -87,6 +88,16 @@ router.post('/upload', auth, upload.array('files', 5), uploadController.uploadFi
 
 // Récupérer un fichier
 router.get('/upload/:id', auth, uploadController.getAttachment as unknown as RequestHandler);
+
+// ============================================
+// MARQUES (Base de connaissances - Public)
+// ============================================
+
+// Liste des marques actives (pas besoin d'auth)
+router.get('/brands', brandController.getAllBrands as unknown as RequestHandler);
+
+// Détails d'une marque
+router.get('/brands/:id', brandController.getBrandById as unknown as RequestHandler);
 
 // ============================================
 // ASSISTANT IA CLIENT (LUMO)

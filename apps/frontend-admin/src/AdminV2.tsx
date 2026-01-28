@@ -24,7 +24,7 @@ import { AdminApi, TokenStorage, ApiError } from './services/api';
 import { adminSocketService } from './services/socket';
 import {
   Ticket, TicketMessage, User as UserType, TicketStatus, TicketPriority, IssueType,
-  UserRole, Notification as NotificationType, TicketStats, Attachment
+  UserRole, Notification as NotificationType, TicketStats, Attachment, Brand
 } from './types';
 
 // ============================================
@@ -481,6 +481,7 @@ const TRANSLATIONS: Record<AppLanguage, Record<string, string>> = {
     'sidebar.automation': 'Automatisation',
     'sidebar.analytics': 'Analytics',
     'sidebar.settings': 'Paramètres',
+    'sidebar.brands': 'Marques',
     // Dashboard
     'dashboard.title': 'Tableau de bord',
     'dashboard.welcome': 'Bienvenue',
@@ -529,6 +530,7 @@ const TRANSLATIONS: Record<AppLanguage, Record<string, string>> = {
     'sidebar.automation': 'Automation',
     'sidebar.analytics': 'Analytics',
     'sidebar.settings': 'Settings',
+    'sidebar.brands': 'Brands',
     // Dashboard
     'dashboard.title': 'Dashboard',
     'dashboard.welcome': 'Welcome',
@@ -1129,6 +1131,7 @@ const Sidebar: React.FC = () => {
         { id: 'team', label: t('sidebar.users'), icon: <Users className="w-5 h-5" />, permission: 'team' },
         { id: 'automation', label: t('sidebar.automation'), icon: <Workflow className="w-5 h-5" />, permission: 'automation' },
         { id: 'analytics', label: t('sidebar.analytics'), icon: <BarChart3 className="w-5 h-5" />, permission: 'reports' },
+        { id: 'brands', label: t('sidebar.brands'), icon: <FolderOpen className="w-5 h-5" />, permission: 'settings' },
         { id: 'settings', label: t('sidebar.settings'), icon: <Settings className="w-5 h-5" />, permission: 'settings' },
       ]
     },
@@ -7429,6 +7432,382 @@ const GeneralSettingsTab: React.FC = () => {
   );
 };
 
+// ============================================
+// VUE: Gestion des Marques (Base de connaissances)
+// ============================================
+
+const BrandsView: React.FC = () => {
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    logoUrl: '',
+    folderUrl: '',
+    websiteUrl: '',
+    isActive: true,
+  });
+
+  // Charger les marques
+  const loadBrands = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await AdminApi.getBrands();
+      setBrands(data);
+    } catch (error) {
+      console.error('Erreur chargement marques:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBrands();
+  }, [loadBrands]);
+
+  // Ouvrir modal création
+  const handleCreate = () => {
+    setEditingBrand(null);
+    setFormData({
+      name: '',
+      description: '',
+      logoUrl: '',
+      folderUrl: '',
+      websiteUrl: '',
+      isActive: true,
+    });
+    setShowModal(true);
+  };
+
+  // Ouvrir modal édition
+  const handleEdit = (brand: Brand) => {
+    setEditingBrand(brand);
+    setFormData({
+      name: brand.name,
+      description: brand.description || '',
+      logoUrl: brand.logoUrl || '',
+      folderUrl: brand.folderUrl || '',
+      websiteUrl: brand.websiteUrl || '',
+      isActive: brand.isActive,
+    });
+    setShowModal(true);
+  };
+
+  // Sauvegarder (création ou mise à jour)
+  const handleSave = async () => {
+    if (!formData.name.trim()) return;
+
+    setSaving(true);
+    try {
+      if (editingBrand) {
+        await AdminApi.updateBrand(editingBrand.id, formData);
+      } else {
+        await AdminApi.createBrand(formData);
+      }
+      await loadBrands();
+      setShowModal(false);
+    } catch (error) {
+      console.error('Erreur sauvegarde marque:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Supprimer une marque
+  const handleDelete = async (id: string) => {
+    if (!confirm('Supprimer cette marque ?')) return;
+
+    setDeleting(id);
+    try {
+      await AdminApi.deleteBrand(id);
+      await loadBrands();
+    } catch (error) {
+      console.error('Erreur suppression marque:', error);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  // Toggle actif/inactif
+  const handleToggleActive = async (brand: Brand) => {
+    try {
+      await AdminApi.updateBrand(brand.id, { isActive: !brand.isActive });
+      await loadBrands();
+    } catch (error) {
+      console.error('Erreur toggle marque:', error);
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gestion des marques</h1>
+          <p className="text-gray-500 mt-1">Base de connaissances - Fiches techniques par marque</p>
+        </div>
+        <Button variant="primary" onClick={handleCreate}>
+          <Plus className="w-4 h-4 mr-2" />
+          Ajouter une marque
+        </Button>
+      </div>
+
+      {/* Liste des marques */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      ) : brands.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+          <FolderOpen className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900">Aucune marque</h3>
+          <p className="text-gray-500 mt-1">Commencez par ajouter une marque</p>
+          <Button variant="primary" className="mt-4" onClick={handleCreate}>
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter une marque
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {brands.map((brand) => (
+            <div
+              key={brand.id}
+              className={`bg-white rounded-xl border p-5 hover:shadow-lg transition-all ${
+                brand.isActive ? 'border-gray-200' : 'border-gray-200 opacity-60'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  {brand.logoUrl ? (
+                    <img
+                      src={brand.logoUrl}
+                      alt={brand.name}
+                      className="w-12 h-12 object-contain rounded-lg border border-gray-100"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">
+                        {brand.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{brand.name}</h3>
+                    {!brand.isActive && (
+                      <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                        Inactif
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleEdit(brand)}
+                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Modifier"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(brand.id)}
+                    disabled={deleting === brand.id}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Supprimer"
+                  >
+                    {deleting === brand.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {brand.description && (
+                <p className="text-sm text-gray-500 mb-3 line-clamp-2">{brand.description}</p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {brand.folderUrl && (
+                  <a
+                    href={brand.folderUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    Fiches techniques
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+                {brand.websiteUrl && (
+                  <a
+                    href={brand.websiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Site web
+                  </a>
+                )}
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <span className="text-xs text-gray-400">
+                  Mis à jour le {new Date(brand.updatedAt).toLocaleDateString('fr-FR')}
+                </span>
+                <button
+                  onClick={() => handleToggleActive(brand)}
+                  className={`text-xs font-medium ${
+                    brand.isActive
+                      ? 'text-green-600 hover:text-green-700'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {brand.isActive ? 'Actif' : 'Activer'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal création/édition */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {editingBrand ? 'Modifier la marque' : 'Ajouter une marque'}
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom de la marque *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex: Bosch, Siemens..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={2}
+                  placeholder="Description optionnelle..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FolderOpen className="w-4 h-4 inline mr-1" />
+                  Lien dossier fiches techniques
+                </label>
+                <input
+                  type="url"
+                  value={formData.folderUrl}
+                  onChange={(e) => setFormData({ ...formData, folderUrl: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="https://sharepoint.com/... ou https://drive.google.com/..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Lien vers le dossier SharePoint, Google Drive ou autre contenant les fiches techniques
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  URL du logo
+                </label>
+                <input
+                  type="url"
+                  value={formData.logoUrl}
+                  onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Site web officiel
+                </label>
+                <input
+                  type="url"
+                  value={formData.websiteUrl}
+                  onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="https://www.marque.com"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <label htmlFor="isActive" className="text-sm text-gray-700">
+                  Marque active (visible pour les utilisateurs)
+                </label>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowModal(false)}>
+                Annuler
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSave}
+                disabled={saving || !formData.name.trim()}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    {editingBrand ? 'Mettre à jour' : 'Créer'}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SettingsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const { user, refreshUser } = useAuth();
@@ -8065,6 +8444,7 @@ const AdminV2: React.FC = () => {
       case 'team': return <TeamView />;
       case 'automation': return <AutomationView />;
       case 'analytics': return <AnalyticsView />;
+      case 'brands': return <BrandsView />;
       case 'settings': return <SettingsView />;
       default: return <PlaceholderView title={currentView.charAt(0).toUpperCase() + currentView.slice(1)} />;
     }

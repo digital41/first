@@ -9,6 +9,7 @@ import * as cannedResponseController from '../controllers/canned-response.contro
 import * as uploadController from '../controllers/upload.controller.js';
 import * as aiController from '../controllers/ai.controller.js';
 import * as automationController from '../controllers/automation.controller.js';
+import * as brandController from '../controllers/brand.controller.js';
 import { upload } from '../config/multer.js';
 
 // ============================================
@@ -203,5 +204,24 @@ router.delete('/automation/rules/:id', adminOnly, automationController.deleteRul
 
 // Activer/Désactiver une règle
 router.put('/automation/rules/:id/toggle', requireStaff as unknown as RequestHandler, automationController.toggleRule as unknown as RequestHandler);
+
+// ============================================
+// MARQUES (Base de connaissances)
+// ============================================
+
+// Liste toutes les marques (incluant inactives)
+router.get('/brands', brandController.getAllBrandsAdmin as unknown as RequestHandler);
+
+// Créer une marque
+router.post('/brands', adminOnly, brandController.createBrand as unknown as RequestHandler);
+
+// Mettre à jour une marque
+router.put('/brands/:id', adminOnly, brandController.updateBrand as unknown as RequestHandler);
+
+// Supprimer une marque
+router.delete('/brands/:id', adminOnly, brandController.deleteBrand as unknown as RequestHandler);
+
+// Réordonner les marques
+router.post('/brands/reorder', adminOnly, brandController.reorderBrands as unknown as RequestHandler);
 
 export default router;

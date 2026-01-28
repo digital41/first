@@ -193,7 +193,7 @@ export function OrderTicketPage() {
     // ============================================
     if (order) {
       const contextParts: string[] = [];
-      contextParts.push('\n\n---\n📋 INFORMATIONS COMMANDE SAGE (contexte pour le support):');
+      contextParts.push('\n\n---\n📋 INFORMATIONS COMMANDE (contexte pour le support):');
 
       // Informations générales
       contextParts.push(`\n• N° Commande: ${order.orderNumber}`);

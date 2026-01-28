@@ -332,7 +332,7 @@ export function OrdersListPage() {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="btn-outline flex items-center justify-center gap-2"
-            title="Actualiser les données depuis SAGE"
+            title="Actualiser les données"
           >
             <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">{isRefreshing ? 'Actualisation...' : 'Actualiser'}</span>

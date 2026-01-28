@@ -67,7 +67,7 @@ export async function loginByCustomerCode(
     });
 
     if (!existingUser) {
-      throw AppError.notFound('Aucun compte client trouvé avec ce code dans SAGE');
+      throw AppError.notFound('Aucun compte client trouvé avec ce code');
     }
 
     // Utilisateur existant mais SAGE non disponible
@@ -405,4 +405,159 @@ export async function getUserById(userId: string): Promise<SafeUser | null> {
 
   const { passwordHash: _, ...safeUser } = user;
   return safeUser;
+}
+
+/**
+ * Connexion client par email + mot de passe
+ * SECURITE: Seuls les emails enregistrés dans SAGE peuvent se connecter
+ */
+export async function loginWithEmail(
+  email: string,
+  password: string
+): Promise<{ user: SafeUser; tokens: TokenPair; mustChangePassword: boolean }> {
+  // 1. Vérifier que l'email existe dans SAGE
+  const sageCustomers = await SageService.searchCustomerByEmail(email);
+
+  if (!sageCustomers || sageCustomers.length === 0) {
+    console.log(`[Auth] REFUS loginWithEmail: Email non trouvé dans SAGE: ${email}`);
+    throw AppError.forbidden(
+      'Votre adresse email n\'est pas enregistrée dans notre système. ' +
+      'Seuls les clients existants peuvent accéder à l\'application.'
+    );
+  }
+
+  console.log(`[Auth] Email trouvé dans SAGE: ${email} (${sageCustomers.length} compte(s) client(s))`)
+
+  // 2. Chercher l'utilisateur local
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    // L'email existe dans SAGE mais pas encore de compte local
+    // C'est possible si l'admin n'a pas encore créé le compte avec mot de passe
+    throw AppError.unauthorized(
+      'Aucun compte avec mot de passe n\'existe pour cette adresse. ' +
+      'Veuillez utiliser la connexion Google ou contactez le support pour obtenir un mot de passe.'
+    );
+  }
+
+  if (!user.passwordHash) {
+    throw AppError.unauthorized(
+      'Ce compte n\'a pas de mot de passe configure. ' +
+      'Utilisez la connexion Google ou contactez le support.'
+    );
+  }
+
+  // 3. Vérifier que le compte est actif
+  if (!user.isActive) {
+    throw AppError.forbidden('Ce compte a ete desactive');
+  }
+
+  // 4. Vérifier le mot de passe
+  const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+  if (!isValidPassword) {
+    throw AppError.unauthorized('Email ou mot de passe incorrect');
+  }
+
+  // 5. Mise à jour dernière visite
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastSeenAt: new Date() },
+  });
+
+  const tokens = generateTokenPair(user);
+
+  const { passwordHash: _, ...safeUser } = user;
+  return { user: safeUser, tokens, mustChangePassword: user.mustChangePassword };
+}
+
+/**
+ * Change le mot de passe (pour première connexion ou changement forcé)
+ * Ne nécessite pas l'ancien mot de passe si mustChangePassword est true
+ */
+export async function changePassword(
+  userId: string,
+  newPassword: string,
+  currentPassword?: string
+): Promise<SafeUser> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    throw AppError.notFound('Utilisateur non trouve');
+  }
+
+  // Si ce n'est pas un changement forcé, vérifier l'ancien mot de passe
+  if (!user.mustChangePassword) {
+    if (!currentPassword) {
+      throw AppError.badRequest('Le mot de passe actuel est requis');
+    }
+
+    if (!user.passwordHash) {
+      throw AppError.badRequest('Ce compte ne peut pas changer de mot de passe');
+    }
+
+    const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValidPassword) {
+      throw AppError.unauthorized('Mot de passe actuel incorrect');
+    }
+  }
+
+  // Valider le nouveau mot de passe
+  if (newPassword.length < 8) {
+    throw AppError.badRequest('Le mot de passe doit contenir au moins 8 caracteres');
+  }
+
+  // Hasher et mettre à jour
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      mustChangePassword: false, // Reset le flag
+    },
+  });
+
+  const { passwordHash: _, ...safeUser } = updatedUser;
+  return safeUser;
+}
+
+/**
+ * Génère un mot de passe temporaire aléatoire
+ */
+export function generateTemporaryPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < 12; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+/**
+ * Définit un mot de passe temporaire pour un utilisateur (admin action)
+ */
+export async function setTemporaryPassword(
+  userId: string
+): Promise<{ password: string; user: SafeUser }> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    throw AppError.notFound('Utilisateur non trouve');
+  }
+
+  const tempPassword = generateTemporaryPassword();
+  const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      mustChangePassword: true,
+    },
+  });
+
+  const { passwordHash: _, ...safeUser } = updatedUser;
+  return { password: tempPassword, user: safeUser };
 }

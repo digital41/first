@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout';
 import { PageLoading } from '@/components/common';
 import {
   LoginPage,
+  ChangePasswordPage,
   DashboardPage,
   SmartHomePage,
   TicketsListPage,
@@ -21,9 +22,9 @@ import {
   NotificationsPage
 } from '@/pages';
 
-// Protected route wrapper
+// Protected route wrapper - requires authentication
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, mustChangePassword } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -32,6 +33,31 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Redirect to change password if required
+  if (mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Route for change password page - requires auth but allows mustChangePassword
+function ChangePasswordRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, mustChangePassword } = useAuth();
+
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // If password already changed, redirect to home
+  if (!mustChangePassword) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -65,6 +91,16 @@ function AppRoutes() {
           <PublicRoute>
             <LoginPage />
           </PublicRoute>
+        }
+      />
+
+      {/* Change password route - for users with mustChangePassword */}
+      <Route
+        path="/change-password"
+        element={
+          <ChangePasswordRoute>
+            <ChangePasswordPage />
+          </ChangePasswordRoute>
         }
       />
 

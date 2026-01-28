@@ -201,6 +201,80 @@ export const authApi = {
     const response = await api.put<ApiResponse<{ user: User }>>('/auth/me', data);
     return response.data.data.user;
   },
+
+  // OAuth - Login with Google
+  loginWithGoogle: async (idToken: string): Promise<AuthResponse & { needsCustomerCode: boolean; mustChangePassword: boolean }> => {
+    const response = await api.post<ApiResponse<{
+      user: User;
+      tokens: { accessToken: string; refreshToken: string };
+      isNewUser: boolean;
+      needsCustomerCode: boolean;
+      mustChangePassword: boolean;
+    }>>('/auth/oauth/google', { idToken });
+
+    const { user, tokens, needsCustomerCode, mustChangePassword } = response.data.data;
+    setTokens(tokens.accessToken, tokens.refreshToken);
+
+    return {
+      user,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      needsCustomerCode,
+      mustChangePassword,
+    };
+  },
+
+  // Login with email + password
+  loginWithEmail: async (email: string, password: string): Promise<AuthResponse & { mustChangePassword: boolean }> => {
+    const response = await api.post<ApiResponse<{
+      user: User;
+      tokens: { accessToken: string; refreshToken: string };
+      mustChangePassword: boolean;
+    }>>('/auth/login/email', { email, password });
+
+    const { user, tokens, mustChangePassword } = response.data.data;
+    setTokens(tokens.accessToken, tokens.refreshToken);
+
+    return {
+      user,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      mustChangePassword,
+    };
+  },
+
+  // Change password
+  changePassword: async (newPassword: string, currentPassword?: string): Promise<User> => {
+    const response = await api.post<ApiResponse<{ user: User }>>('/auth/change-password', {
+      newPassword,
+      currentPassword,
+    });
+    return response.data.data.user;
+  },
+
+  // Link user account to SAGE customer code
+  linkCustomerCode: async (customerCode: string): Promise<User> => {
+    const response = await api.post<ApiResponse<{ user: User }>>('/auth/link-customer-code', { customerCode });
+    return response.data.data.user;
+  },
+
+  // Get linked social accounts
+  getLinkedAccounts: async (): Promise<Array<{
+    provider: string;
+    email: string;
+    name: string;
+    avatarUrl?: string;
+    createdAt: string;
+  }>> => {
+    const response = await api.get<ApiResponse<{ accounts: Array<{
+      provider: string;
+      email: string;
+      name: string;
+      avatarUrl?: string;
+      createdAt: string;
+    }> }>>('/auth/oauth/accounts');
+    return response.data.data.accounts;
+  },
 };
 
 // ============================================
@@ -544,6 +618,36 @@ export const knowledgeApi = {
         article.title.toLowerCase().includes(query.toLowerCase()) ||
         article.content.toLowerCase().includes(query.toLowerCase())
     );
+  },
+};
+
+// ============================================
+// API: MARQUES (Base de connaissances)
+// ============================================
+
+interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  folderUrl?: string;
+  websiteUrl?: string;
+  order: number;
+  isActive: boolean;
+}
+
+export const brandsApi = {
+  // Get all active brands
+  getAll: async (): Promise<Brand[]> => {
+    const response = await api.get<ApiResponse<Brand[]>>('/brands');
+    return response.data.data;
+  },
+
+  // Get brand by ID
+  getById: async (id: string): Promise<Brand> => {
+    const response = await api.get<ApiResponse<Brand>>(`/brands/${id}`);
+    return response.data.data;
   },
 };
 

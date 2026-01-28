@@ -63,6 +63,7 @@ export interface User {
   customerCode?: string;    // Code client SAGE
   companyName?: string;     // Nom de la société
   isActive: boolean;
+  mustChangePassword?: boolean; // Force changement mdp a la premiere connexion
   createdAt: string;
   updatedAt: string;
 }
@@ -235,6 +236,21 @@ export interface FAQItem {
   answer: string;
   category: string;
   order: number;
+}
+
+// Marque (pour fiches techniques)
+export interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  folderUrl?: string;    // Lien vers le dossier externe (SharePoint/Drive)
+  websiteUrl?: string;
+  order: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // API Types

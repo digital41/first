@@ -176,7 +176,7 @@ export function CreateTicketPage() {
 
     // Contexte complet de la commande (pour l'IA)
     if (selectedOrder) {
-      parts.push('\n\n---\n📋 INFORMATIONS COMMANDE SAGE (contexte pour le support):');
+      parts.push('\n\n---\n📋 INFORMATIONS COMMANDE (contexte pour le support):');
       parts.push(`\n• N° Commande: ${selectedOrder.orderNumber}`);
       parts.push(`• Statut: ${selectedOrder.status}`);
 

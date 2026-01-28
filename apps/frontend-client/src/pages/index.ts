@@ -1,4 +1,5 @@
 export { LoginPage } from './LoginPage';
+export { ChangePasswordPage } from './ChangePasswordPage';
 export { DashboardPage } from './DashboardPage';
 export { SmartHomePage } from './SmartHomePage';
 export { TicketsListPage } from './TicketsListPage';
